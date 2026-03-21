@@ -6,9 +6,10 @@ import { SIDEBAR_ICONS } from "@/app/_constants/dashboard";
 interface SidebarProps {
   readonly activeNav: number;
   readonly onNavChange: (idx: number) => void;
+  readonly onOpenSettings: () => void;
 }
 
-export function Sidebar({ activeNav, onNavChange }: SidebarProps) {
+export function Sidebar({ activeNav, onNavChange, onOpenSettings }: SidebarProps) {
   return (
     <aside className="aether-sidebar">
       <div className="aether-sidebar__monogram">A</div>
@@ -26,7 +27,11 @@ export function Sidebar({ activeNav, onNavChange }: SidebarProps) {
           </button>
         ))}
         <div className="aether-sidebar__settings">
-          <button className="aether-sidebar__icon" title="Settings">
+          <button
+            className="aether-sidebar__icon"
+            title="Settings"
+            onClick={onOpenSettings}
+          >
             <Settings size={18} />
           </button>
         </div>

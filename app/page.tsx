@@ -8,12 +8,14 @@ import { Sidebar } from "./_components/sidebar";
 import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
+import { SettingsDialog } from "./_components/settings-dialog";
 import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
   const showWelcome = !engine.hasStarted;
   const [factsOpen, setFactsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   /* Show the facts panel only once we actually have data */
   const hasFacts =
@@ -29,6 +31,7 @@ export default function AetherDashboard() {
       <Sidebar
         activeNav={engine.activeNav}
         onNavChange={engine.setActiveNav}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* ─── Chat Panel ─── */}
@@ -149,6 +152,9 @@ export default function AetherDashboard() {
           onClearSession={engine.clearSession}
         />
       </div>
+
+      {/* ─── Settings Dialog ─── */}
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

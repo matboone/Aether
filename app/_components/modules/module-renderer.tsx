@@ -243,7 +243,7 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
   switch (moduleType) {
     case "upload":
       return (
-        <div className="module-card" style={cardStyle()}>
+        <div className="module-card" style={cardStyle({ padding: 0 })}>
           <UploadZone uploaded={engine.uploaded} onUpload={engine.handleUpload} />
         </div>
       );
