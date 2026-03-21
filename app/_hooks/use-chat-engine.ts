@@ -45,6 +45,9 @@ export interface ChatEngine {
   uploadFilename: string | null;
   uploadSizeLabel: string | null;
   profile: ProfileInfo;
+  rightPanelModules: ModuleType[];
+  minimizedModules: Set<ModuleType>;
+  toggleMinimize: (m: ModuleType) => void;
 
   threadRef: React.RefObject<HTMLDivElement | null>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -151,6 +154,13 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts): SessionFacts
   };
 }
 
+/* Modules that belong in the right strategy panel instead of inline in chat */
+const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
+  "action-plan",
+  "doc-chips",
+  "phone-script",
+]);
+
 function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
   const set = new Set<ModuleType>();
 
@@ -175,11 +185,22 @@ function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSe
       set.add("eligibility");
     }
   }
-  if (ui.resolutionSummary) {
+  /* Resolution only once session is truly complete */
+  if (ui.resolutionSummary && (step === "RESOLUTION_RECORDED" || step === "COMPLETE")) {
     set.add("resolution");
   }
 
   return MODULE_ORDER.filter((moduleType) => set.has(moduleType));
+}
+
+function rightPanelModulesFromUi(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
+  return nextModules(step, ui, facts).filter((m) => RIGHT_PANEL_MODULE_TYPES.has(m));
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function toIncomeInputBracket(input: string): string {
@@ -221,7 +242,6 @@ export function useChatEngine(): ChatEngine {
   const [activeNav, setActiveNav] = useState(0);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     provider: false,
-    patient: false,
     bill: false,
     eligibility: false,
     resolution: false,
@@ -233,6 +253,8 @@ export function useChatEngine(): ChatEngine {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [uploadSizeLabel, setUploadSizeLabel] = useState<string | null>(null);
+  const [rightPanelMods, setRightPanelMods] = useState<ModuleType[]>([]);
+  const [minimizedModules, setMinimizedModules] = useState<Set<ModuleType>>(new Set());
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -270,6 +292,7 @@ export function useChatEngine(): ChatEngine {
       setBackendUi(ui);
       setAnalysisReady(Boolean(ui.analysisSummary));
       setUploaded(Boolean(domainFacts.uploadedBillId));
+      setRightPanelMods(rightPanelModulesFromUi(nextStep, ui, domainFacts));
 
       const mapped = mapDomainFactsToDashboardFacts(domainFacts);
       const previous = factsRef.current;
@@ -343,7 +366,6 @@ export function useChatEngine(): ChatEngine {
   useEffect(() => {
     const sectionHasData: Record<string, boolean> = {
       provider: !!(facts.hospitalName || facts.hospitalId),
-      patient: !!(facts.hasInsurance || facts.incidentSummary),
       bill: !!(facts.estimatedBillTotal || facts.uploadedBillId),
       eligibility: !!(facts.incomeBracket || facts.assistanceEligible),
       resolution: !!facts.negotiationOutcome,
@@ -453,7 +475,7 @@ export function useChatEngine(): ChatEngine {
           const uploadData = (await uploadResponse.json()) as UploadBillResponseDto;
 
           setUploadFilename(uploadData.filename);
-          setUploadSizeLabel(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+          setUploadSizeLabel(formatFileSize(file.size));
           setUploaded(true);
           flashFact("uploadedBillId");
 
@@ -531,13 +553,15 @@ export function useChatEngine(): ChatEngine {
     setIncomeConfirmed(false);
     setShowMoreItems(false);
     setSummaryExpanded(false);
-    setOpenSections({ provider: false, patient: false, bill: false, eligibility: false, resolution: false });
+    setOpenSections({ provider: false, bill: false, eligibility: false, resolution: false });
     setTechIdsOpen(false);
     setHasStarted(false);
     setBackendUi(null);
     setSessionId(null);
     setUploadFilename(null);
     setUploadSizeLabel(null);
+    setRightPanelMods([]);
+    setMinimizedModules(new Set());
 
     const run = async () => {
       try {
@@ -581,6 +605,34 @@ export function useChatEngine(): ChatEngine {
     [handleSend],
   );
 
+  const toggleMinimize = useCallback((m: ModuleType) => {
+    setMinimizedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) {
+        next.delete(m);
+      } else {
+        next.add(m);
+      }
+      return next;
+    });
+  }, []);
+
+  /* ─── Live-poll session state so facts panel updates in real-time ─── */
+  useEffect(() => {
+    if (!sessionId) return;
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/sessions/${sessionId}`);
+        if (!resp.ok) return;
+        const data = (await resp.json()) as { step: SessionStep; facts: DomainSessionFacts; ui: RenderableSessionUi };
+        applyServerState(data.step, data.facts, data.ui, sessionId);
+      } catch {
+        /* silent — best-effort polling */
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [sessionId, applyServerState]);
+
   return {
     stage,
     messages,
@@ -609,6 +661,9 @@ export function useChatEngine(): ChatEngine {
       accountName: shortAccount(sessionId),
       status: stage.replaceAll("_", " "),
     },
+    rightPanelModules: rightPanelMods,
+    minimizedModules,
+    toggleMinimize,
     threadRef,
     textareaRef,
     handleSend,

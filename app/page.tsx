@@ -9,6 +9,7 @@ import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
+import { ModuleRenderer } from "./_components/modules/module-renderer";
 import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export default function AetherDashboard() {
@@ -24,6 +25,8 @@ export default function AetherDashboard() {
     engine.facts.estimatedBillTotal !== null ||
     engine.facts.incomeBracket !== null ||
     engine.facts.negotiationOutcome !== null;
+
+  const hasRightPanel = engine.rightPanelModules.length > 0;
 
   return (
     <div className="aether-dashboard">
@@ -125,6 +128,20 @@ export default function AetherDashboard() {
           </>
         )}
       </main>
+
+      {/* ─── Right Strategy Panel (action plan / docs / call script) ─── */}
+      {hasRightPanel && (
+        <aside className="aether-strategy-panel">
+          <div className="aether-strategy-panel__head">
+            <span className="aether-strategy-panel__title">Strategy</span>
+          </div>
+          <div className="aether-strategy-panel__body">
+            {engine.rightPanelModules.map((m, idx) => (
+              <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
+            ))}
+          </div>
+        </aside>
+      )}
 
       {/* ─── Facts Toggle ─── */}
       <button

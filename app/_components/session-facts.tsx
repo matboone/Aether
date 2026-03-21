@@ -3,7 +3,6 @@
 import React from "react";
 import {
   Building2,
-  User,
   FileText,
   ShieldCheck,
   Target,
@@ -13,7 +12,7 @@ import {
   Trash2,
   Settings,
 } from "lucide-react";
-import type { SessionFacts, InsuranceStatus } from "@/app/_types/dashboard";
+import type { SessionFacts } from "@/app/_types/dashboard";
 
 /* ─── Modular Fact Card ─── */
 
@@ -96,12 +95,6 @@ function MonoChip({ children }: { readonly children: React.ReactNode }) {
   return <span className="fact-mono">{children}</span>;
 }
 
-function InsuranceTag({ status }: { readonly status: InsuranceStatus }) {
-  if (status === "insured") return <Badge variant="success">Insured</Badge>;
-  if (status === "uninsured") return <Badge variant="error">Uninsured</Badge>;
-  return <Badge variant="muted">Unknown</Badge>;
-}
-
 function EmptyVal() {
   return <span className="fact-kv__empty">&mdash;</span>;
 }
@@ -111,11 +104,6 @@ function EmptyVal() {
 function getProviderStatus(f: SessionFacts): "filled" | "partial" | "empty" {
   if (f.hospitalName && f.hospitalId) return "filled";
   if (f.hospitalName || f.hospitalId) return "partial";
-  return "empty";
-}
-function getPatientStatus(f: SessionFacts): "filled" | "partial" | "empty" {
-  if (f.hasInsurance && f.incidentSummary) return "filled";
-  if (f.hasInsurance || f.incidentSummary) return "partial";
   return "empty";
 }
 function getBillStatus(f: SessionFacts): "filled" | "partial" | "empty" {
@@ -163,7 +151,7 @@ export function SessionFactsPanel({
     <aside className="facts-panel">
       {/* Panel header */}
       <div className="facts-panel__head">
-        <span className="facts-panel__title">Session Context</span>
+        <span className="facts-panel__title">Session Information</span>
       </div>
 
       {/* Cards */}
@@ -191,34 +179,6 @@ export function SessionFactsPanel({
           <FactRow label="System ID" flash={flashFields.has("hospitalId")}>
             {facts.hospitalId ? <MonoChip>{facts.hospitalId}</MonoChip> : <EmptyVal />}
           </FactRow>
-        </FactCard>
-
-        {/* ─ Patient ─ */}
-        <FactCard
-          icon={User}
-          label="Patient"
-          isOpen={openSections.patient}
-          onToggle={() => onToggleSection("patient")}
-          status={getPatientStatus(facts)}
-        >
-          <FactRow label="Insurance" flash={flashFields.has("hasInsurance")}>
-            {facts.hasInsurance ? <InsuranceTag status={facts.hasInsurance} /> : <EmptyVal />}
-          </FactRow>
-          <div className={`fact-kv ${flashFields.has("incidentSummary") ? "fact-kv--flash" : ""}`} style={{ flexDirection: "column", alignItems: "stretch" }}>
-            <span className="fact-kv__key">Summary</span>
-            {facts.incidentSummary ? (
-              <>
-                <p className={`fact-summary-text ${summaryExpanded ? "fact-summary-text--open" : ""}`}>
-                  {facts.incidentSummary}
-                </p>
-                <button className="fact-link" onClick={onToggleSummary}>
-                  {summaryExpanded ? "Less" : "More"}
-                </button>
-              </>
-            ) : (
-              <EmptyVal />
-            )}
-          </div>
         </FactCard>
 
         {/* ─ Bill ─ */}

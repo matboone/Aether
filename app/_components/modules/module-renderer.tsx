@@ -6,6 +6,7 @@
    ═══════════════════════════════════════════════════════ */
 
 import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ModuleType } from "@/app/_types/dashboard";
 import type { ChatEngine } from "@/app/_hooks/use-chat-engine";
 import { UploadZone } from "./upload-zone";
@@ -207,17 +208,33 @@ const LOAD_DELAYS: Partial<Record<ModuleType, number>> = {
   "resolution": 900,
 };
 
+/* Human-readable labels for the minimizable header */
+const MODULE_LABELS: Record<ModuleType, string> = {
+  "upload": "Upload Bill",
+  "bill-receipt": "Bill Receipt",
+  "bill-summary": "Bill Summary",
+  "line-items": "Flagged Line Items",
+  "income-selector": "Income Selector",
+  "eligibility": "Eligibility",
+  "action-plan": "Action Plan",
+  "doc-chips": "Generated Documents",
+  "phone-script": "Call Script",
+  "resolution": "Resolution Summary",
+};
+
 interface ModuleRendererProps {
   readonly moduleType: ModuleType;
   readonly idx: number;
   readonly engine: ChatEngine;
+  /** When true, skip the minimize chrome (used for right-panel rendering) */
+  readonly bare?: boolean;
 }
 
-export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps) {
+export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRendererProps) {
   const delay = idx * 80;
   const loadDelay = LOAD_DELAYS[moduleType] ?? 0;
-
   const [loading, setLoading] = useState(loadDelay > 0);
+  const isMinimized = engine.minimizedModules.has(moduleType);
 
   let inferredEligible: boolean | null = null;
   if (engine.facts.assistanceEligible === "likely") {
@@ -247,99 +264,103 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
     );
   }
 
+  /* ─── Minimize header (shown on all modules unless bare) ─── */
+  const MinHeader = bare ? null : (
+    <button
+      type="button"
+      className="module-card__min-header"
+      onClick={() => engine.toggleMinimize(moduleType)}
+      aria-expanded={!isMinimized}
+    >
+      <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      {isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+    </button>
+  );
+
+  if (isMinimized && !bare) {
+    return (
+      <div className="module-card module-card--minimized" style={cardStyle()}>
+        {MinHeader}
+      </div>
+    );
+  }
+
+  const wrapCard = (children: React.ReactNode, extra: React.CSSProperties = {}) => (
+    <div className="module-card" style={cardStyle(extra)}>
+      {MinHeader}
+      {children}
+    </div>
+  );
+
   switch (moduleType) {
     case "upload":
-      return (
-        <div className="module-card" style={cardStyle({ padding: 0 })}>
-          <UploadZone
-            uploaded={engine.uploaded}
-            uploading={engine.isUploading}
-            filename={engine.uploadFilename}
-            sizeLabel={engine.uploadSizeLabel}
-            onUpload={engine.handleUpload}
-          />
-        </div>
+      return wrapCard(
+        <UploadZone
+          uploaded={engine.uploaded}
+          uploading={engine.isUploading}
+          filename={engine.uploadFilename}
+          sizeLabel={engine.uploadSizeLabel}
+          onUpload={engine.handleUpload}
+        />,
       );
     case "bill-receipt":
-      return (
-        <div className="module-card" style={cardStyle()}>
-          <BillReceipt />
-        </div>
-      );
+      return wrapCard(<BillReceipt />);
     case "bill-summary":
-      return (
-        <div
-          className="module-card"
-          style={cardStyle({ padding: 0, overflow: "hidden" })}
-        >
-          <BillSummary
-            analysisReady={engine.analysisReady}
-            hospitalName={engine.facts.hospitalName}
-            totalAmount={engine.backendUi?.analysisSummary?.originalTotal ?? null}
-            analysisSummary={engine.backendUi?.analysisSummary}
-          />
-        </div>
+      return wrapCard(
+        <BillSummary
+          analysisReady={engine.analysisReady}
+          hospitalName={engine.facts.hospitalName}
+          totalAmount={engine.backendUi?.analysisSummary?.originalTotal ?? null}
+          analysisSummary={engine.backendUi?.analysisSummary}
+        />,
+        { padding: 0, overflow: "hidden" },
       );
     case "line-items":
-      return (
-        <div className="module-card" style={cardStyle()}>
-          <LineItemsTable
-            showMore={engine.showMoreItems}
-            onShowMore={() => engine.setShowMoreItems(true)}
-            flaggedItems={engine.backendUi?.flaggedItems ?? []}
-            analysisSummary={engine.backendUi?.analysisSummary}
-          />
-        </div>
+      return wrapCard(
+        <LineItemsTable
+          showMore={engine.showMoreItems}
+          onShowMore={() => engine.setShowMoreItems(true)}
+          flaggedItems={engine.backendUi?.flaggedItems ?? []}
+          analysisSummary={engine.backendUi?.analysisSummary}
+        />,
       );
     case "income-selector":
-      return (
-        <div className="module-card" style={cardStyle()}>
-          <IncomeSelector
-            selectedIncome={engine.selectedIncome}
-            householdSize={engine.householdSize}
-            confirmed={engine.incomeConfirmed}
-            onSelect={(opt) => engine.setSelectedIncome(opt)}
-            onHouseholdChange={engine.setHouseholdSize}
-            onConfirm={engine.handleIncomeConfirm}
-          />
-        </div>
+      return wrapCard(
+        <IncomeSelector
+          selectedIncome={engine.selectedIncome}
+          householdSize={engine.householdSize}
+          confirmed={engine.incomeConfirmed}
+          onSelect={(opt) => engine.setSelectedIncome(opt)}
+          onHouseholdChange={engine.setHouseholdSize}
+          onConfirm={engine.handleIncomeConfirm}
+        />,
       );
     case "eligibility":
-      return (
-        <div className="module-card" style={cardStyle({ animationDelay: `${delay + 200}ms` })}>
-          <EligibilityCard
-            eligible={engine.backendUi?.negotiationPlan?.assistanceAssessment?.likelyEligible ?? inferredEligible}
-            assessment={engine.backendUi?.negotiationPlan?.assistanceAssessment ?? null}
-            hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
-          />
-        </div>
+      return wrapCard(
+        <EligibilityCard
+          eligible={engine.backendUi?.negotiationPlan?.assistanceAssessment?.likelyEligible ?? inferredEligible}
+          assessment={engine.backendUi?.negotiationPlan?.assistanceAssessment ?? null}
+          hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
+        />,
       );
     case "action-plan":
-      return (
-        <div className="module-card" style={cardStyle()}>
-          <ActionPlan nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />
-        </div>
+      return wrapCard(
+        <ActionPlan nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />,
       );
     case "doc-chips":
-      return (
-        <div className="module-card" style={cardStyle({ animationDelay: `${delay + 160}ms` })}>
-          <DocChips nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />
-        </div>
+      return wrapCard(
+        <DocChips nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />,
       );
     case "phone-script":
-      return (
-        <div className="module-card" style={cardStyle({ padding: 0 })}>
-          <PhoneScript
-            hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
-            lines={engine.backendUi?.negotiationPlan?.phoneScript ?? []}
-          />
-        </div>
+      return wrapCard(
+        <PhoneScript
+          hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
+          lines={engine.backendUi?.negotiationPlan?.phoneScript ?? []}
+        />,
       );
     case "resolution":
-      return (
-        <div className="module-card" style={cardStyle()}>
-          <ResolutionSummary summary={engine.backendUi?.resolutionSummary ?? null} />
-        </div>
+      return wrapCard(
+        <ResolutionSummary summary={engine.backendUi?.resolutionSummary ?? null} />,
       );
     default:
       return null;
