@@ -138,6 +138,7 @@ export interface ParsedBillDocument extends BaseMongoDocument {
   hospitalName: string | null;
   totalAmount: number | null;
   phoneNumber: string | null;
+  email: string | null;
   sourceType: ParsedBillSourceType;
   lineItems: ParsedBillLineItem[];
 }
@@ -291,6 +292,7 @@ export interface DemoBillTemplate {
   hospitalName: string;
   totalAmount: number;
   phoneNumber: string;
+  email?: string | null;
   sourceType: ParsedBillSourceType;
   checksum?: string;
   lineItems: ParsedBillLineItem[];

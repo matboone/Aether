@@ -46,11 +46,17 @@ describe("route smoke tests", () => {
     mock.module("@/src/services/parser.service", () => ({
       parserService: {
         extractTransientBill: async () => ({
-          hospitalName: "TriStar Medical Center",
-          totalAmount: 4875,
-          phoneNumber: "615-555-0101",
+          hospitalName: "Cigna Healthcare",
+          totalAmount: 862,
+          phoneNumber: "615-450-5591",
           sourceType: "itemized_statement",
-          lineItems: [{ rawLabel: "ER Facility Fee", amount: 2450 }],
+          lineItems: [
+            {
+              rawLabel:
+                "Surgical pathology consultation and report on referred slides prepared elsewhere (88321)",
+              amount: 545,
+            },
+          ],
         }),
       },
     }));
@@ -58,27 +64,29 @@ describe("route smoke tests", () => {
       analysisService: {
         analyzeTransientBill: async () => ({
           summary: {
-            originalTotal: 4875,
+            originalTotal: 862,
             flaggedCount: 1,
-            estimatedOvercharge: 1200,
+            estimatedOvercharge: 185,
           },
           flaggedItems: [
             {
-              label: "ER Facility Fee",
-              chargedAmount: 2450,
-              benchmarkAmount: 950,
-              fairRangeLow: 700,
-              fairRangeHigh: 1250,
+              label:
+                "Surgical pathology consultation and report on referred slides prepared elsewhere (88321)",
+              chargedAmount: 545,
+              benchmarkAmount: 280,
+              fairRangeLow: 180,
+              fairRangeHigh: 360,
               severity: "high",
               reason: "above_benchmark",
-              suggestedTargetAmount: 1250,
+              suggestedTargetAmount: 360,
             },
           ],
           allItems: [
             {
-              label: "ER Facility Fee",
-              chargedAmount: 2450,
-              benchmarkAmount: 950,
+              label:
+                "Surgical pathology consultation and report on referred slides prepared elsewhere (88321)",
+              chargedAmount: 545,
+              benchmarkAmount: 280,
               matched: true,
             },
           ],
@@ -91,7 +99,7 @@ describe("route smoke tests", () => {
     const formData = new FormData();
     formData.set(
       "file",
-      new File(["TriStar Medical Center\nER Facility Fee 2450"], "tristar_bill_demo.txt", {
+      new File(["Cigna Healthcare\nSurgical pathology consultation (88321) 545"], "cigna_bill_demo.txt", {
         type: "text/plain",
       }),
     );
@@ -106,6 +114,6 @@ describe("route smoke tests", () => {
 
     expect(response.status).toBe(200);
     expect(body.analysisSummary.flaggedCount).toBe(1);
-    expect(body.parseResult.hospitalName).toBe("TriStar Medical Center");
+    expect(body.parseResult.hospitalName).toBe("Cigna Healthcare");
   });
 });

@@ -1,5 +1,6 @@
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { logError, logInfo, summarizeSessionFacts, summarizeText } from "@/src/lib/logger";
 import type { RenderableSessionUi, SessionFacts, SessionStep } from "@/src/types/domain";
 
 const fallbackMessages: Record<SessionStep, string> = {
@@ -32,11 +33,22 @@ export const llmService = {
     ui: RenderableSessionUi;
     latestUserMessage: string;
     toolHighlights: string[];
+    approvedDraft: string;
   }) {
     try {
+      logInfo("llm.service", "llm.request_started", {
+        step: input.step,
+        facts: summarizeSessionFacts(input.facts),
+        approvedDraftPreview: summarizeText(input.approvedDraft),
+        latestUserMessagePreview: summarizeText(input.latestUserMessage),
+        toolHighlightCount: input.toolHighlights.length,
+      });
       const { text } = await generateText({
         model: google("gemini-2.5-flash"),
         prompt: JSON.stringify({
+          approvedDraft: input.approvedDraft,
+          responseJob:
+            "Write the next assistant reply for the user. The backend already decided the workflow and allowed next action. You are only shaping the wording.",
           currentStep: input.step,
           knownFacts: input.facts,
           analysisSummary: input.ui.analysisSummary ?? null,
@@ -49,15 +61,20 @@ export const llmService = {
             "Do not invent numbers.",
             "Do not invent hospital policies.",
             "Only use data provided in this context.",
-            "Ask only the next relevant question allowed by the backend state.",
+            "Keep the meaning and sequence of the approved draft.",
+            "Ask only the next allowed question or present only the next allowed step.",
+            "Do not add extra workflow steps.",
+            "Sound like a calm, capable assistant in a live conversation.",
             "Be concise, polished, and helpful.",
           ],
         }),
         system: [
-          "You are the wording layer for a controlled medical bill demo assistant.",
-          "You do not decide workflow, tools, or policy.",
-          "You only phrase the next allowed question or summarize backend outputs.",
+          "You are Aether, the conversational voice of a controlled medical bill demo assistant.",
+          "The backend state machine already decided workflow, tools, hospital strategy, and the next allowed action.",
+          "Your job is to produce the assistant's actual reply using only the provided data.",
+          "Be conversational and natural, but do not change the workflow.",
           "Never diagnose, give legal advice, or invent numeric values.",
+          "If the approved draft contains a hospital name or phone number, preserve it exactly.",
         ].join(" "),
         providerOptions: {
           google: {
@@ -71,9 +88,19 @@ export const llmService = {
         },
       });
 
-      return text.trim() || fallbackMessages[input.step];
-    } catch {
-      return fallbackMessages[input.step];
+      const message = text.trim() || input.approvedDraft || fallbackMessages[input.step];
+      logInfo("llm.service", "llm.request_completed", {
+        step: input.step,
+        usedFallbackDraft: !text.trim(),
+        assistantPreview: summarizeText(message),
+      });
+      return message;
+    } catch (error) {
+      logError("llm.service", "llm.request_failed", error, {
+        step: input.step,
+        approvedDraftPreview: summarizeText(input.approvedDraft),
+      });
+      return input.approvedDraft || fallbackMessages[input.step];
     }
   },
 };

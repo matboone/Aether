@@ -1,5 +1,12 @@
 import { Types } from "mongoose";
 import { ApiError } from "@/src/lib/api";
+import {
+  logInfo,
+  summarizeSessionFacts,
+  summarizeText,
+  summarizeToolEvents,
+  summarizeTransition,
+} from "@/src/lib/logger";
 import { BillAnalysisModel } from "@/src/models/bill-analysis.model";
 import { NegotiationPlanModel } from "@/src/models/negotiation-plan.model";
 import { ResolutionModel } from "@/src/models/resolution.model";
@@ -10,6 +17,10 @@ import { messageService } from "@/src/services/message.service";
 import { assistanceService } from "@/src/services/assistance.service";
 import { planService } from "@/src/services/plan.service";
 import { sessionService } from "@/src/services/session.service";
+import {
+  buildGuidedAssistantMessage,
+  inferInsuranceFromText,
+} from "@/src/services/workflow-guidance.service";
 import type {
   ChatMessageRequestDto,
   ChatMessageResponseDto,
@@ -24,21 +35,13 @@ import type {
 
 function parseHospitalName(content: string): string | undefined {
   const hospitalMatch = content.match(
-    /(tristar medical center|tristar|vanderbilt(?: university medical center)?|vumc|ascension(?: saint thomas)?|saint thomas)/i,
+    /(cigna healthcare|cigna)/i,
   );
   return hospitalMatch?.[1];
 }
 
 function parseInsurance(content: string): boolean | null | undefined {
-  if (/\b(no insurance|uninsured|without insurance)\b/i.test(content)) {
-    return false;
-  }
-
-  if (/\b(i have insurance|insured|with insurance)\b/i.test(content)) {
-    return true;
-  }
-
-  return undefined;
+  return inferInsuranceFromText(content);
 }
 
 function parseEstimatedTotal(content: string): number | undefined {
@@ -49,11 +52,17 @@ function parseEstimatedTotal(content: string): number | undefined {
   return Number(amountMatch[1].replace(/,/g, ""));
 }
 
-function inferFactPatchFromMessage(content: string): Partial<SessionFacts> {
+function inferFactPatchFromMessage(
+  content: string,
+  currentStep: SessionStep,
+): Partial<SessionFacts> {
   const patch: Partial<SessionFacts> = {};
   const hospitalName = parseHospitalName(content);
   const hasInsurance = parseInsurance(content);
-  const estimatedBillTotal = parseEstimatedTotal(content);
+  const estimatedBillTotal =
+    currentStep === "NEW" || currentStep === "INTAKE"
+      ? parseEstimatedTotal(content)
+      : undefined;
 
   if (hospitalName) {
     patch.hospitalName = hospitalName;
@@ -73,6 +82,18 @@ function inferFactPatchFromMessage(content: string): Partial<SessionFacts> {
 
 function needsIncome(facts: SessionFacts) {
   return !facts.incomeBracket;
+}
+
+function wantsPaymentPlanHelp(content: string) {
+  return /\b(payment plan|monthly payment|installments|financ|spread this out)\b/i.test(
+    content,
+  );
+}
+
+function closesCase(content: string) {
+  return /\b(case closed|close it|close the case|no thanks|no thank you|all set|done)\b/i.test(
+    content,
+  );
 }
 
 async function buildUi(sessionId: string, sessionStep: SessionStep, facts: SessionFacts): Promise<RenderableSessionUi> {
@@ -100,7 +121,11 @@ async function buildUi(sessionId: string, sessionStep: SessionStep, facts: Sessi
     }
   }
 
-  if (facts.hospitalId) {
+  if (facts.hospitalName) {
+    ui.hospitalStrategy = await hospitalService.lookupHospitalPolicy({
+      hospitalName: facts.hospitalName,
+    });
+  } else if (facts.hospitalId) {
     const hospitalStrategy = await hospitalService.getStrategyById(facts.hospitalId);
     ui.hospitalStrategy = hospitalStrategy;
   }
@@ -225,6 +250,13 @@ async function buildPlanForSession(
 
 export const orchestratorService = {
   async handleChatMessage(input: ChatMessageRequestDto): Promise<ChatMessageResponseDto> {
+    logInfo("orchestrator.service", "chat.handle_started", {
+      sessionId: input.sessionId,
+      contentPreview: summarizeText(input.content),
+      hasFactPatch: Boolean(input.factPatch),
+      hasIncomeInput: Boolean(input.incomeInput),
+      hasResolutionInput: Boolean(input.resolutionInput),
+    });
     const session = await sessionService.getSessionById(input.sessionId);
     const toolEvents: ToolEvent[] = [];
 
@@ -236,9 +268,16 @@ export const orchestratorService = {
 
     let facts: SessionFacts = {
       ...session.facts,
-      ...inferFactPatchFromMessage(input.content),
+      ...inferFactPatchFromMessage(input.content, session.step),
       ...(input.factPatch ?? {}),
     };
+
+    logInfo("orchestrator.service", "chat.facts_inferred", {
+      sessionId: input.sessionId,
+      previousStep: session.step,
+      previousFacts: summarizeSessionFacts(session.facts),
+      inferredFacts: summarizeSessionFacts(facts),
+    });
 
     if (input.incomeInput?.householdSize) {
       facts.householdSize = input.incomeInput.householdSize;
@@ -277,6 +316,11 @@ export const orchestratorService = {
       currentStep = "INTAKE";
       const updated = await sessionService.setStepAndFacts(input.sessionId, currentStep, facts);
       facts = updated.facts;
+      logInfo("orchestrator.service", "chat.transition", {
+        sessionId: input.sessionId,
+        ...summarizeTransition(session.step, currentStep),
+        facts: summarizeSessionFacts(facts),
+      });
     } else {
       const updated = await sessionService.patchFacts(input.sessionId, facts);
       facts = updated.facts;
@@ -293,6 +337,12 @@ export const orchestratorService = {
     switch (currentStep) {
       case "INTAKE": {
         if (!facts.hospitalName || facts.hasInsurance === undefined || facts.hasInsurance === null) {
+          logInfo("orchestrator.service", "chat.intake_blocked", {
+            sessionId: input.sessionId,
+            missingHospital: !facts.hospitalName,
+            missingInsurance:
+              facts.hasInsurance === undefined || facts.hasInsurance === null,
+          });
           break;
         }
 
@@ -303,6 +353,11 @@ export const orchestratorService = {
         );
         facts = updated.facts;
         currentStep = updated.step;
+        logInfo("orchestrator.service", "chat.transition", {
+          sessionId: input.sessionId,
+          ...summarizeTransition("INTAKE", currentStep),
+          facts: summarizeSessionFacts(facts),
+        });
         break;
       }
 
@@ -315,10 +370,22 @@ export const orchestratorService = {
           );
           facts = updated.facts;
           currentStep = updated.step;
+          logInfo("orchestrator.service", "chat.transition", {
+            sessionId: input.sessionId,
+            ...summarizeTransition("BILL_ANALYZED", currentStep),
+            reason: "income_required",
+            facts: summarizeSessionFacts(facts),
+          });
         } else {
           const updated = await buildPlanForSession(input.sessionId, facts, toolEvents);
           facts = updated.facts;
           currentStep = updated.step;
+          logInfo("orchestrator.service", "chat.transition", {
+            sessionId: input.sessionId,
+            ...summarizeTransition("BILL_ANALYZED", currentStep),
+            reason: "plan_built",
+            facts: summarizeSessionFacts(facts),
+          });
         }
         break;
       }
@@ -328,6 +395,12 @@ export const orchestratorService = {
           const updated = await buildPlanForSession(input.sessionId, facts, toolEvents);
           facts = updated.facts;
           currentStep = updated.step;
+          logInfo("orchestrator.service", "chat.transition", {
+            sessionId: input.sessionId,
+            ...summarizeTransition("AWAITING_INCOME", currentStep),
+            reason: "income_provided",
+            facts: summarizeSessionFacts(facts),
+          });
         }
         break;
       }
@@ -336,13 +409,35 @@ export const orchestratorService = {
         const reductionMentioned = /\b(reduced|discount|waiver|payment plan|settled)\b/i.test(
           input.content,
         );
-        if (reductionMentioned) {
-          const updated = await sessionService.updateStep(
-            input.sessionId,
-            "NEGOTIATION_IN_PROGRESS",
-          );
+        const resolutionInput = input.resolutionInput;
+
+        if (reductionMentioned || resolutionInput?.resolutionType) {
+          const updated = await sessionService.updateStep(input.sessionId, "NEGOTIATION_IN_PROGRESS");
           facts = updated.facts;
           currentStep = updated.step;
+          logInfo("orchestrator.service", "chat.transition", {
+            sessionId: input.sessionId,
+            ...summarizeTransition("STRATEGY_READY", currentStep),
+            reason: "negotiation_result_detected",
+          });
+        }
+
+        if (resolutionInput?.resolutionType) {
+          await orchestratorService.recordResolution({
+            sessionId: input.sessionId,
+            reducedAmount: resolutionInput.reducedAmount ?? null,
+            resolutionType: resolutionInput.resolutionType,
+            notes: resolutionInput.notes ?? null,
+          });
+
+          const afterResolution = await sessionService.getSessionById(input.sessionId);
+          facts = afterResolution.facts;
+          currentStep = afterResolution.step;
+          logInfo("orchestrator.service", "chat.resolution_recorded_from_strategy", {
+            sessionId: input.sessionId,
+            step: currentStep,
+            facts: summarizeSessionFacts(facts),
+          });
         }
         break;
       }
@@ -360,14 +455,29 @@ export const orchestratorService = {
           const afterResolution = await sessionService.getSessionById(input.sessionId);
           facts = afterResolution.facts;
           currentStep = afterResolution.step;
+          logInfo("orchestrator.service", "chat.resolution_recorded", {
+            sessionId: input.sessionId,
+            step: currentStep,
+            facts: summarizeSessionFacts(facts),
+          });
         }
         break;
       }
 
       case "RESOLUTION_RECORDED": {
-        const updated = await sessionService.updateStep(input.sessionId, "COMPLETE");
-        facts = updated.facts;
-        currentStep = updated.step;
+        const followUpRequested = wantsPaymentPlanHelp(input.content);
+        const explicitClose = closesCase(input.content);
+
+        if (followUpRequested || explicitClose) {
+          const updated = await sessionService.updateStep(input.sessionId, "COMPLETE");
+          facts = updated.facts;
+          currentStep = updated.step;
+          logInfo("orchestrator.service", "chat.transition", {
+            sessionId: input.sessionId,
+            ...summarizeTransition("RESOLUTION_RECORDED", currentStep),
+            reason: followUpRequested ? "payment_plan_follow_up" : "case_closed",
+          });
+        }
         break;
       }
 
@@ -377,12 +487,27 @@ export const orchestratorService = {
 
     const ui = await buildUi(input.sessionId, currentStep, facts);
     const toolHighlights = toolEvents.map((event) => event.message);
+    const approvedDraft = buildGuidedAssistantMessage({
+      step: currentStep,
+      facts,
+      ui,
+      latestUserMessage: input.content,
+    });
     const assistantMessage = await llmService.generateAssistantMessage({
       step: currentStep,
       facts,
       ui,
       latestUserMessage: input.content,
       toolHighlights,
+      approvedDraft,
+    });
+
+    logInfo("orchestrator.service", "chat.handle_completed", {
+      sessionId: input.sessionId,
+      step: currentStep,
+      facts: summarizeSessionFacts(facts),
+      toolEvents: summarizeToolEvents(toolEvents),
+      assistantPreview: summarizeText(assistantMessage),
     });
 
     await messageService.createMessage({
@@ -413,6 +538,13 @@ export const orchestratorService = {
     hospitalName: string | null;
     estimatedBillTotal: number | null;
   }) {
+    logInfo("orchestrator.service", "bill.analysis_ingested", {
+      sessionId: input.sessionId,
+      parsedBillId: input.parsedBillId,
+      analysisId: input.analysisId,
+      hospitalName: input.hospitalName,
+      estimatedBillTotal: input.estimatedBillTotal,
+    });
     let factsPatch: Partial<SessionFacts> = {
       parsedBillId: input.parsedBillId,
       analysisId: input.analysisId,
@@ -436,10 +568,22 @@ export const orchestratorService = {
       factsPatch,
     );
 
+    logInfo("orchestrator.service", "bill.analysis_session_updated", {
+      sessionId: input.sessionId,
+      step: session.step,
+      facts: summarizeSessionFacts(session.facts),
+    });
+
     return session;
   },
 
   async recordResolution(input: RecordResolutionRequestDto) {
+    logInfo("orchestrator.service", "resolution.record_started", {
+      sessionId: input.sessionId,
+      reducedAmount: input.reducedAmount ?? null,
+      resolutionType: input.resolutionType,
+      notesPreview: summarizeText(input.notes ?? null),
+    });
     const session = await sessionService.getSessionById(input.sessionId);
     const originalAmount =
       session.facts.negotiationOutcome?.originalAmount ??
@@ -468,6 +612,13 @@ export const orchestratorService = {
       },
     );
 
+    logInfo("orchestrator.service", "resolution.record_completed", {
+      sessionId: input.sessionId,
+      resolutionId: resolution._id.toString(),
+      step: updated.step,
+      facts: summarizeSessionFacts(updated.facts),
+    });
+
     return { resolution, session: updated };
   },
 
@@ -476,6 +627,12 @@ export const orchestratorService = {
     if (!session) {
       throw new ApiError("SESSION_NOT_FOUND", "Session not found", 404);
     }
+
+    logInfo("orchestrator.service", "session.view_loaded", {
+      sessionId,
+      step: session.step,
+      facts: summarizeSessionFacts(session.facts),
+    });
 
     return {
       sessionId: session._id.toString(),

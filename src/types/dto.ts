@@ -79,6 +79,7 @@ export interface ExtractBillDocumentOutputDto {
   hospitalName: string | null;
   totalAmount: number | null;
   phoneNumber: string | null;
+  email: string | null;
   lineItems: Array<{
     rawLabel: string;
     amount: number | null;
@@ -172,6 +173,7 @@ export interface QuickScanResponseDto {
     hospitalName: string | null;
     totalAmount: number | null;
     phoneNumber: string | null;
+    email: string | null;
     sourceType: ParsedBillSourceType;
     lineItems: Array<{
       rawLabel: string;

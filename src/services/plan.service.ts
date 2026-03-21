@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { ApiError } from "@/src/lib/api";
+import { logInfo } from "@/src/lib/logger";
 import { BillAnalysisModel } from "@/src/models/bill-analysis.model";
 import { HospitalPolicyModel } from "@/src/models/hospital-policy.model";
 import { NegotiationPlanModel } from "@/src/models/negotiation-plan.model";
@@ -34,6 +35,11 @@ export const planService = {
       likelyOutcome: string;
     } | null;
   }): Promise<BuildStrategyResponseDto> {
+    logInfo("plan.service", "plan.build_started", {
+      analysisId: input.analysisId,
+      hospitalId: input.hospitalId,
+      hasAssistanceAssessment: Boolean(input.assistanceAssessment),
+    });
     const analysis = await BillAnalysisModel.findById(input.analysisId).lean();
     if (!analysis) {
       throw new ApiError("ANALYSIS_NOT_FOUND", "Analysis not found", 404);
@@ -99,6 +105,17 @@ export const planService = {
       callInstructions,
     });
 
+    logInfo("plan.service", "plan.built", {
+      planId: plan._id.toString(),
+      analysisId: input.analysisId,
+      hospitalId: input.hospitalId,
+      flaggedItemsUsed: topFlags.length,
+      nextActionsCount: nextActions.length,
+      phoneScriptCount: phoneScript.length,
+      requestFinancialAssistance: targetAsk.requestFinancialAssistance,
+      requestPaymentPlan: targetAsk.requestPaymentPlan,
+    });
+
     return {
       planId: plan._id.toString(),
       nextActions,
@@ -114,6 +131,10 @@ export const planService = {
     if (!plan) {
       throw new ApiError("PLAN_NOT_FOUND", "Negotiation plan not found", 404);
     }
+    logInfo("plan.service", "plan.loaded", {
+      planId,
+      nextActionsCount: plan.nextActions.length,
+    });
     return plan;
   },
 };

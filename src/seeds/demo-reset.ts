@@ -10,7 +10,15 @@ import { runSeed } from "@/src/seeds/seed";
 
 export async function runDemoReset() {
   await connectToDatabase();
-  await Promise.all([
+  const [
+    messagesDeleted,
+    uploadsDeleted,
+    parsedBillsDeleted,
+    analysesDeleted,
+    plansDeleted,
+    resolutionsDeleted,
+    sessionsDeleted,
+  ] = await Promise.all([
     MessageModel.deleteMany({}),
     UploadedBillModel.deleteMany({}),
     ParsedBillModel.deleteMany({}),
@@ -19,5 +27,18 @@ export async function runDemoReset() {
     ResolutionModel.deleteMany({}),
     SessionModel.deleteMany({}),
   ]);
-  await runSeed();
+  const seeded = await runSeed();
+
+  return {
+    deleted: {
+      messages: messagesDeleted.deletedCount,
+      uploadedBills: uploadsDeleted.deletedCount,
+      parsedBills: parsedBillsDeleted.deletedCount,
+      analyses: analysesDeleted.deletedCount,
+      plans: plansDeleted.deletedCount,
+      resolutions: resolutionsDeleted.deletedCount,
+      sessions: sessionsDeleted.deletedCount,
+    },
+    seeded,
+  };
 }

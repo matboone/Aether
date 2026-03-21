@@ -1,6 +1,8 @@
 import { HospitalPolicyModel } from "@/src/models/hospital-policy.model";
 import { normalizeText } from "@/src/lib/normalize";
 import { ApiError } from "@/src/lib/api";
+import { logInfo } from "@/src/lib/logger";
+import { hospitalPoliciesSeed } from "@/src/seeds/data";
 import type { LookupHospitalPolicyOutputDto } from "@/src/types/dto";
 
 function toPolicyDto(policy: {
@@ -31,17 +33,23 @@ export const hospitalService = {
   async lookupHospitalPolicy(input: { hospitalName: string }) {
     const rawName = input.hospitalName.trim();
     const normalized = normalizeText(rawName);
+    const seededFallback = toPolicyDto({
+      _id: {
+        toString: () => "seeded-cigna-healthcare",
+      },
+      ...hospitalPoliciesSeed[0],
+    });
 
     const allPolicies = await HospitalPolicyModel.find().lean();
-    const fallback =
-      allPolicies.find(
-        (policy) => policy.canonicalName === "Generic Hospital Billing Office",
-      ) ?? allPolicies[0];
-
     const exactCanonical = allPolicies.find(
       (policy) => normalizeText(policy.canonicalName) === normalized,
     );
     if (exactCanonical) {
+      logInfo("hospital.service", "hospital.lookup", {
+        inputHospitalName: rawName,
+        matchType: "exact_canonical",
+        matchedHospital: exactCanonical.canonicalName,
+      });
       return toPolicyDto(exactCanonical);
     }
 
@@ -49,6 +57,11 @@ export const hospitalService = {
       policy.aliases.some((alias: string) => normalizeText(alias) === normalized),
     );
     if (aliasMatch) {
+      logInfo("hospital.service", "hospital.lookup", {
+        inputHospitalName: rawName,
+        matchType: "alias",
+        matchedHospital: aliasMatch.canonicalName,
+      });
       return toPolicyDto(aliasMatch);
     }
 
@@ -57,7 +70,13 @@ export const hospitalService = {
       return canonical.includes(normalized) || normalized.includes(canonical);
     });
 
-    return toPolicyDto(containsMatch ?? fallback);
+    const result = containsMatch ? toPolicyDto(containsMatch) : seededFallback;
+    logInfo("hospital.service", "hospital.lookup", {
+      inputHospitalName: rawName,
+      matchType: containsMatch ? "contains" : "seeded_fallback",
+      matchedHospital: result.canonicalName,
+    });
+    return result;
   },
 
   async getStrategyById(hospitalId: string) {
@@ -65,6 +84,10 @@ export const hospitalService = {
     if (!policy) {
       throw new ApiError("HOSPITAL_NOT_FOUND", "Hospital strategy not found", 404);
     }
+    logInfo("hospital.service", "hospital.strategy_loaded", {
+      hospitalId,
+      canonicalName: policy.canonicalName,
+    });
     return toPolicyDto(policy);
   },
 };

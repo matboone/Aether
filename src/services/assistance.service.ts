@@ -1,4 +1,5 @@
 import { ApiError } from "@/src/lib/api";
+import { logInfo } from "@/src/lib/logger";
 import { HospitalPolicyModel } from "@/src/models/hospital-policy.model";
 import type {
   AssistanceAssessment,
@@ -65,6 +66,14 @@ export const assistanceService = {
     );
 
     if (!matrix) {
+      logInfo("assistance.service", "assistance.qualified", {
+        hospitalId: input.hospitalId,
+        incomeBracket: normalizedIncomeBracket,
+        hasInsurance: input.hasInsurance ?? null,
+        likelyEligible: false,
+        likelyOutcome: "unclear",
+        matchFound: false,
+      });
       return {
         likelyEligible: false,
         likelyOutcome: "unclear",
@@ -73,6 +82,15 @@ export const assistanceService = {
     }
 
     if (input.hasInsurance === true && matrix.likelyOutcome === "full_waiver") {
+      logInfo("assistance.service", "assistance.qualified", {
+        hospitalId: input.hospitalId,
+        incomeBracket: normalizedIncomeBracket,
+        hasInsurance: true,
+        likelyEligible: matrix.likelyEligible,
+        likelyOutcome: "partial_discount",
+        matchFound: true,
+        adjustedForInsurance: true,
+      });
       return {
         likelyEligible: matrix.likelyEligible,
         likelyOutcome: "partial_discount",
@@ -83,6 +101,15 @@ export const assistanceService = {
       };
     }
 
+    logInfo("assistance.service", "assistance.qualified", {
+      hospitalId: input.hospitalId,
+      incomeBracket: normalizedIncomeBracket,
+      hasInsurance: input.hasInsurance ?? null,
+      likelyEligible: matrix.likelyEligible,
+      likelyOutcome: matrix.likelyOutcome,
+      matchFound: true,
+      adjustedForInsurance: false,
+    });
     return {
       likelyEligible: matrix.likelyEligible,
       likelyOutcome: matrix.likelyOutcome,

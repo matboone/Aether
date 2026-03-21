@@ -1,4 +1,4 @@
-# Cliniq Billing Advocate Backend Integration
+# Aether Backend Integration
 
 ## Environment
 - `MONGODB_URI`
@@ -15,7 +15,7 @@
    ```json
    {
      "sessionId": "string",
-     "content": "I have a Vanderbilt hospital bill and no insurance",
+     "content": "I have a Cigna Healthcare bill and no insurance",
      "factPatch": {
        "incidentSummary": "ER visit last month"
      }
@@ -51,16 +51,17 @@ Example response:
 ```json
 {
   "parseResult": {
-    "hospitalName": "TriStar Medical Center",
-    "totalAmount": 4875,
-    "phoneNumber": "615-555-0101",
+    "hospitalName": "Cigna Healthcare",
+    "totalAmount": 862,
+    "phoneNumber": "615-450-5591",
+    "email": "Cigna@gmail.com",
     "sourceType": "itemized_statement",
     "lineItems": []
   },
   "analysisSummary": {
-    "originalTotal": 4875,
-    "flaggedCount": 2,
-    "estimatedOvercharge": 1450
+    "originalTotal": 862,
+    "flaggedCount": 4,
+    "estimatedOvercharge": 237
   },
   "flaggedItems": [],
   "allItems": [],
