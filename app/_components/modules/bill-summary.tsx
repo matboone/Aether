@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 
 interface BillSummaryProps {
-  analysisReady: boolean;
+  readonly analysisReady: boolean;
 }
 
 export function BillSummary({ analysisReady }: BillSummaryProps) {
@@ -25,14 +25,14 @@ export function BillSummary({ analysisReady }: BillSummaryProps) {
         <div className="bill-summary__total">$6,000.00</div>
       </div>
       <div className="bill-summary__right">
-        {!analysisReady ? (
-          <div className="status-badge status-badge--analyzing">
-            <span className="pulse-dot" />
-            ANALYZING&hellip;
-          </div>
-        ) : (
+        {analysisReady ? (
           <div className="status-badge status-badge--complete">
             <Check size={12} /> Analysis Complete
+          </div>
+        ) : (
+          <div className="status-badge status-badge--analyzing">
+            <span className="pulse-dot" />{" "}
+            ANALYZING&hellip;
           </div>
         )}
         <div>

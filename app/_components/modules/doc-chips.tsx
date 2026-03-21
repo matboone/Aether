@@ -8,8 +8,8 @@ export function DocChips() {
     <>
       <div className="doc-chips__label">GENERATED DOCUMENTS</div>
       <div className="doc-chips__row">
-        {DOCUMENTS.map((doc, i) => (
-          <div key={i} className="doc-chip">
+        {DOCUMENTS.map((doc) => (
+          <div key={doc.name} className="doc-chip">
             <FileText size={18} className="doc-chip__icon" />
             <div className="doc-chip__name">{doc.name}</div>
             <div className="doc-chip__status">{doc.status}</div>

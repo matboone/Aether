@@ -6,10 +6,10 @@ import type { ChatEngine } from "@/app/_hooks/use-chat-engine";
 import { ModuleRenderer } from "./modules/module-renderer";
 
 interface ChatThreadProps {
-  messages: Message[];
-  isTyping: boolean;
-  threadRef: React.RefObject<HTMLDivElement | null>;
-  engine: ChatEngine;
+  readonly messages: Message[];
+  readonly isTyping: boolean;
+  readonly threadRef: React.RefObject<HTMLDivElement | null>;
+  readonly engine: ChatEngine;
 }
 
 export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThreadProps) {

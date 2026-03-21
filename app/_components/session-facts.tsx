@@ -12,25 +12,30 @@ function FactsSection({
   onToggle,
   children,
 }: {
-  label: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  readonly label: string;
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className="facts-section">
-      <div className="facts-section__header" onClick={onToggle}>
+      <button
+        type="button"
+        className="facts-section__header"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+      >
         <span className="facts-section__label">{label}</span>
         <ChevronDown
           className={`facts-section__chevron ${isOpen ? "facts-section__chevron--open" : ""}`}
         />
-      </div>
+      </button>
       {isOpen && <div className="facts-section__content">{children}</div>}
     </div>
   );
 }
 
-function FactEmpty({ label }: { label: string }) {
+function FactEmpty({ label }: { readonly label: string }) {
   return (
     <>
       <span className="fact-row__label">{label}</span>
@@ -39,7 +44,7 @@ function FactEmpty({ label }: { label: string }) {
   );
 }
 
-function InsuranceBadge({ status }: { status: InsuranceStatus }) {
+function InsuranceBadge({ status }: { readonly status: InsuranceStatus }) {
   if (status === "insured")
     return <span className="fact-badge fact-badge--secondary">Insured</span>;
   if (status === "uninsured")
@@ -50,15 +55,15 @@ function InsuranceBadge({ status }: { status: InsuranceStatus }) {
 /* ─── Main component ─── */
 
 interface SessionFactsProps {
-  facts: SessionFacts;
-  flashFields: Set<string>;
-  summaryExpanded: boolean;
-  openSections: Record<string, boolean>;
-  techIdsOpen: boolean;
-  onToggleSection: (key: string) => void;
-  onToggleTechIds: () => void;
-  onToggleSummary: () => void;
-  onClearSession: () => void;
+  readonly facts: SessionFacts;
+  readonly flashFields: Set<string>;
+  readonly summaryExpanded: boolean;
+  readonly openSections: Record<string, boolean>;
+  readonly techIdsOpen: boolean;
+  readonly onToggleSection: (key: string) => void;
+  readonly onToggleTechIds: () => void;
+  readonly onToggleSummary: () => void;
+  readonly onClearSession: () => void;
 }
 
 export function SessionFactsPanel({

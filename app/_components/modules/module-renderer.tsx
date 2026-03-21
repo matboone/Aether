@@ -18,9 +18,9 @@ import { PhoneScript } from "./phone-script";
 import { ResolutionSummary } from "./resolution-summary";
 
 interface ModuleRendererProps {
-  moduleType: ModuleType;
-  idx: number;
-  engine: ChatEngine;
+  readonly moduleType: ModuleType;
+  readonly idx: number;
+  readonly engine: ChatEngine;
 }
 
 export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps) {

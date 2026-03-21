@@ -9,7 +9,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type {
   Stage,
   Message,
-  ModuleType,
   SessionFacts,
 } from "@/app/_types/dashboard";
 import { EMPTY_FACTS } from "@/app/_constants/dashboard";

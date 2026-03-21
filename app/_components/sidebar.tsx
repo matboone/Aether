@@ -4,8 +4,8 @@ import { Settings } from "lucide-react";
 import { SIDEBAR_ICONS } from "@/app/_constants/dashboard";
 
 interface SidebarProps {
-  activeNav: number;
-  onNavChange: (idx: number) => void;
+  readonly activeNav: number;
+  readonly onNavChange: (idx: number) => void;
 }
 
 export function Sidebar({ activeNav, onNavChange }: SidebarProps) {

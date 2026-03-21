@@ -3,8 +3,8 @@
 import { UploadCloud, FileText, Check } from "lucide-react";
 
 interface UploadZoneProps {
-  uploaded: boolean;
-  onUpload: () => void;
+  readonly uploaded: boolean;
+  readonly onUpload: () => void;
 }
 
 export function UploadZone({ uploaded, onUpload }: UploadZoneProps) {
@@ -24,7 +24,11 @@ export function UploadZone({ uploaded, onUpload }: UploadZoneProps) {
   }
 
   return (
-    <div className="upload-zone" onClick={onUpload}>
+    <button
+      type="button"
+      className="upload-zone"
+      onClick={onUpload}
+    >
       <div className="upload-zone__icon">
         <UploadCloud size={28} />
       </div>
@@ -32,9 +36,9 @@ export function UploadZone({ uploaded, onUpload }: UploadZoneProps) {
       <div className="upload-zone__sub">
         PDF or photo &mdash; we&apos;ll extract everything
       </div>
-      <button className="btn-primary" onClick={onUpload}>
+      <span className="btn-primary">
         Choose File
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }

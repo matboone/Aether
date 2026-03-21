@@ -12,7 +12,7 @@ export function ActionPlan() {
       </div>
       <div className="stepper-list">
         {ACTION_STEPS.map((step, i) => (
-          <div key={i} className="step-item">
+          <div key={step.title} className="step-item">
             <div className="step-item__left">
               <div className={`step-circle step-circle--${step.status}`}>
                 {step.status === "completed" ? <Check size={14} /> : i + 1}

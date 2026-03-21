@@ -6,13 +6,13 @@ import type { Stage } from "@/app/_types/dashboard";
 import { SUGGESTION_CHIPS } from "@/app/_constants/dashboard";
 
 interface ChatInputProps {
-  stage: Stage;
-  inputValue: string;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  onChipClick: (text: string) => void;
-  onSend: () => void;
-  onTextareaChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
+  readonly stage: Stage;
+  readonly inputValue: string;
+  readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  readonly onChipClick: (text: string) => void;
+  readonly onSend: () => void;
+  readonly onTextareaChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  readonly onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
 export function ChatInput({
@@ -56,8 +56,8 @@ export function ChatInput({
           onKeyDown={onKeyDown}
         />
         <button
-          className={`input-icon-btn send-btn ${!inputValue.trim() ? "send-btn--disabled" : ""}`}
-          onClick={onSend}
+          className={`input-icon-btn send-btn ${inputValue.trim() ? "" : "send-btn--disabled"}`}
+          onClick={() => onSend()}
           title="Send"
         >
           <ArrowRight size={16} />

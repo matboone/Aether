@@ -4,12 +4,12 @@ import { Minus, Plus } from "lucide-react";
 import { INCOME_OPTIONS } from "@/app/_constants/dashboard";
 
 interface IncomeSelectorProps {
-  selectedIncome: string | null;
-  householdSize: number;
-  confirmed: boolean;
-  onSelect: (opt: string) => void;
-  onHouseholdChange: React.Dispatch<React.SetStateAction<number>>;
-  onConfirm: () => void;
+  readonly selectedIncome: string | null;
+  readonly householdSize: number;
+  readonly confirmed: boolean;
+  readonly onSelect: (opt: string) => void;
+  readonly onHouseholdChange: React.Dispatch<React.SetStateAction<number>>;
+  readonly onConfirm: () => void;
 }
 
 export function IncomeSelector({
