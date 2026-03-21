@@ -150,6 +150,7 @@ export default function AetherDashboard() {
           onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
           onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
           onClearSession={engine.clearSession}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       </div>
 

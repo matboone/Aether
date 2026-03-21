@@ -11,6 +11,7 @@ import {
   TrendingDown,
   Hash,
   Trash2,
+  Settings,
 } from "lucide-react";
 import type { SessionFacts, InsuranceStatus } from "@/app/_types/dashboard";
 
@@ -143,6 +144,7 @@ interface SessionFactsProps {
   readonly onToggleTechIds: () => void;
   readonly onToggleSummary: () => void;
   readonly onClearSession: () => void;
+  readonly onOpenSettings: () => void;
 }
 
 export function SessionFactsPanel({
@@ -155,13 +157,13 @@ export function SessionFactsPanel({
   onToggleTechIds,
   onToggleSummary,
   onClearSession,
+  onOpenSettings,
 }: SessionFactsProps) {
   return (
     <aside className="facts-panel">
       {/* Panel header */}
       <div className="facts-panel__head">
         <span className="facts-panel__title">Session Context</span>
-        <span className="facts-panel__subtitle">Auto-collected from chat</span>
       </div>
 
       {/* Cards */}
@@ -329,11 +331,16 @@ export function SessionFactsPanel({
         </FactCard>
       </div>
 
-      {/* Clear */}
-      <button className="facts-panel__clear" onClick={onClearSession}>
-        <Trash2 size={12} />
-        Clear Session
-      </button>
+      {/* Footer actions */}
+      <div className="facts-panel__footer">
+        <button className="facts-panel__settings" onClick={onOpenSettings} title="Settings">
+          <Settings size={14} />
+        </button>
+        <button className="facts-panel__clear" onClick={onClearSession}>
+          <Trash2 size={12} />
+          Clear Session
+        </button>
+      </div>
     </aside>
   );
 }

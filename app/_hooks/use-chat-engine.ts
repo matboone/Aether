@@ -71,17 +71,39 @@ export function useChatEngine(): ChatEngine {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    provider: true,
-    patient: true,
-    bill: true,
-    eligibility: true,
-    resolution: true,
+    provider: false,
+    patient: false,
+    bill: false,
+    eligibility: false,
+    resolution: false,
   });
   const [techIdsOpen, setTechIdsOpen] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /* ─── Auto-expand cards when data fills in ─── */
+  useEffect(() => {
+    const sectionHasData: Record<string, boolean> = {
+      provider: !!(facts.hospitalName || facts.hospitalId),
+      patient: !!(facts.hasInsurance || facts.incidentSummary),
+      bill: !!(facts.estimatedBillTotal || facts.uploadedBillId),
+      eligibility: !!(facts.incomeBracket || facts.assistanceEligible),
+      resolution: !!facts.negotiationOutcome,
+    };
+    setOpenSections((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const key of Object.keys(sectionHasData)) {
+        if (sectionHasData[key] && !prev[key]) {
+          next[key] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [facts]);
 
   /* ─── Scroll to bottom on new messages ─── */
   useEffect(() => {
@@ -370,6 +392,7 @@ export function useChatEngine(): ChatEngine {
     setIncomeConfirmed(false);
     setShowMoreItems(false);
     setSummaryExpanded(false);
+    setOpenSections({ provider: false, patient: false, bill: false, eligibility: false, resolution: false });
     setTechIdsOpen(false);
     setHasStarted(false);
   }, []);
