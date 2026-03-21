@@ -276,7 +276,7 @@ export function SessionFactsPanel({
           )}
           {facts.assistanceEligible === "checking" && (
             <span className="fact-badge fact-badge--primary fact-badge--pulse">
-              Checking&hellip;
+              Checking…
             </span>
           )}
           {!facts.assistanceEligible && (

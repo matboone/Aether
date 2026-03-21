@@ -1,9 +1,13 @@
 "use client";
 
+import { ShieldCheck } from "lucide-react";
+
 export function EligibilityCard() {
   return (
     <div className="eligibility-card">
-      <div className="eligibility-card__icon-area">&check;</div>
+      <div className="eligibility-card__icon-area">
+        <ShieldCheck size={28} />
+      </div>
       <div className="eligibility-card__headline">Full Waiver Likely</div>
       <div className="eligibility-card__sub">
         Based on TriStar&apos;s HCA charity care policy, your income bracket
@@ -12,7 +16,7 @@ export function EligibilityCard() {
       <div className="savings-strip">
         <span className="savings-strip__label">Estimated savings:</span>
         <span className="savings-strip__value">
-          40&ndash;100% of your balance
+          40–100% of your balance
         </span>
       </div>
       <div className="eligibility-card__actions">

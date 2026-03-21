@@ -1,5 +1,7 @@
 "use client";
 
+import { BadgeCheck } from "lucide-react";
+
 export function ResolutionSummary() {
   return (
     <div className="resolution-summary">
@@ -26,7 +28,7 @@ export function ResolutionSummary() {
           Resolved through charity care waiver
         </div>
         <div className="resolution-callout__accuracy">
-          &check; Guaranteed Accuracy
+          <BadgeCheck size={12} /> Guaranteed Accuracy
         </div>
       </div>
       <div style={{ clear: "both" }} />

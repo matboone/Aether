@@ -161,6 +161,7 @@
 .aether-sidebar__icon--active {
   background: var(--clr-primary-fixed);
   color: var(--clr-primary);
+  box-shadow: 0 2px 10px rgba(50, 46, 138, 0.12);
 }
 
 .aether-sidebar__icon:hover:not(.aether-sidebar__icon--active) {
@@ -191,7 +192,7 @@
 }
 
 .aether-chat__topbar {
-  padding: 1rem 1.25rem 0.625rem 2rem;
+  padding: 1rem clamp(1.5rem, 8%, 6rem) 0.625rem clamp(2rem, 10%, 8rem);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -216,6 +217,7 @@
 .aether-chat__back-btn:hover {
   background: var(--clr-surface-high);
   color: var(--clr-text);
+  box-shadow: 0 2px 8px rgba(29, 27, 25, 0.08);
 }
 
 .aether-chat__breadcrumb {
@@ -235,7 +237,7 @@
 .aether-chat__thread {
   flex: 1;
   overflow-y: auto;
-  padding: 0 1.25rem 120px 2rem;
+  padding: 0 clamp(1.5rem, 8%, 6rem) 120px clamp(2rem, 10%, 8rem);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -297,7 +299,7 @@
 }
 
 .msg-bubble--user {
-  max-width: 75%;
+  max-width: 88%;
   background: var(--gradient-primary);
   border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
   color: var(--clr-on-primary);
@@ -362,7 +364,7 @@
 
 .module-card:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-float);
+  box-shadow: 0 6px 24px rgba(29, 27, 25, 0.07);
 }
 
 /* ─── Module 1: Upload Zone ─── */
@@ -379,6 +381,7 @@
 .upload-zone:hover {
   border-color: rgba(200, 197, 212, 0.6);
   background: rgba(226, 223, 255, 0.12);
+  box-shadow: 0 0 20px rgba(50, 46, 138, 0.08);
 }
 
 .upload-zone__icon {
@@ -738,6 +741,7 @@
 
 .stepper-btn:hover {
   background: var(--clr-primary-fixed);
+  box-shadow: 0 2px 8px rgba(50, 46, 138, 0.12);
 }
 
 .stepper-value {
@@ -771,6 +775,7 @@
 .income-pill:hover {
   background: var(--clr-primary-fixed);
   color: var(--clr-primary);
+  box-shadow: 0 2px 10px rgba(50, 46, 138, 0.12);
 }
 
 .income-pill--selected {
@@ -1072,6 +1077,7 @@
 
 .phone-script__copy-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
 }
 
 .phone-script__body {
@@ -1207,7 +1213,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0.625rem 1.25rem 1.25rem 2rem;
+  padding: 0.625rem clamp(1.5rem, 8%, 6rem) 1.25rem clamp(2rem, 10%, 8rem);
   background: rgba(254, 248, 243, 0.85);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -1245,6 +1251,7 @@
   background: var(--clr-primary-fixed);
   color: var(--clr-primary);
   transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(50, 46, 138, 0.15);
 }
 
 .input-container {
@@ -1306,6 +1313,7 @@
 
 .send-btn:not(.send-btn--disabled):hover {
   transform: scale(1.05);
+  box-shadow: 0 3px 14px rgba(50, 46, 138, 0.3);
 }
 
 /* ─── Session Facts Panel ─── */
@@ -1581,6 +1589,7 @@
 
 .btn-primary:hover {
   transform: scale(1.02);
+  box-shadow: 0 4px 18px rgba(50, 46, 138, 0.25);
 }
 
 .btn-primary:active {
@@ -1602,6 +1611,7 @@
 
 .btn-secondary:hover {
   background: var(--clr-primary-fixed);
+  box-shadow: 0 2px 12px rgba(50, 46, 138, 0.1);
 }
 
 .btn-primary--full {
@@ -1697,7 +1707,7 @@
 
 .welcome-feature-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-float);
+  box-shadow: 0 8px 28px rgba(29, 27, 25, 0.08);
 }
 
 .welcome-feature-card__icon {
@@ -1724,4 +1734,61 @@
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── Skeleton Loading ─── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--clr-surface-high) 25%,
+    var(--clr-surface-low) 37%,
+    var(--clr-surface-high) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+.skeleton-line {
+  height: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.skeleton-line--short { width: 40%; }
+.skeleton-line--medium { width: 65%; }
+.skeleton-line--long { width: 90%; }
+.skeleton-line--full { width: 100%; }
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-block {
+  height: 3rem;
+  border-radius: var(--radius-card);
+}
+
+.skeleton-header {
+  height: 2rem;
+  width: 50%;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-card);
+}
+
+/* ─── Facts panel visibility (shows only when data exists) ─── */
+
+.aether-facts-wrap--hidden,
+.facts-toggle-btn--hidden {
+  display: none;
+}
+
+.aether-facts-wrap--entering {
+  animation: fadeSlideIn 350ms ease-out both;
 }

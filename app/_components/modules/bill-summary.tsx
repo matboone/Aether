@@ -32,7 +32,7 @@ export function BillSummary({ analysisReady }: BillSummaryProps) {
         ) : (
           <div className="status-badge status-badge--analyzing">
             <span className="pulse-dot" />{" "}
-            ANALYZING&hellip;
+            Analyzing…
           </div>
         )}
         <div>

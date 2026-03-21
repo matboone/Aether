@@ -15,6 +15,14 @@ export default function AetherDashboard() {
   const showWelcome = !engine.hasStarted;
   const [factsOpen, setFactsOpen] = useState(true);
 
+  /* Show the facts panel only once we actually have data */
+  const hasFacts =
+    engine.facts.hospitalName !== null ||
+    engine.facts.hasInsurance !== null ||
+    engine.facts.estimatedBillTotal !== null ||
+    engine.facts.incomeBracket !== null ||
+    engine.facts.negotiationOutcome !== null;
+
   return (
     <div className="aether-dashboard">
       {/* ─── Left Sidebar ─── */}
@@ -115,7 +123,7 @@ export default function AetherDashboard() {
 
       {/* ─── Facts Toggle ─── */}
       <button
-        className="facts-toggle-btn"
+        className={`facts-toggle-btn ${hasFacts ? "" : "facts-toggle-btn--hidden"}`}
         onClick={() => setFactsOpen((prev) => !prev)}
         aria-label={factsOpen ? "Hide session facts" : "Show session facts"}
       >
@@ -123,7 +131,7 @@ export default function AetherDashboard() {
       </button>
 
       {/* ─── Session Facts Panel ─── */}
-      <div className={`aether-facts-wrap ${factsOpen ? "" : "aether-facts-wrap--collapsed"}`}>
+      <div className={`aether-facts-wrap ${hasFacts ? "aether-facts-wrap--entering" : "aether-facts-wrap--hidden"} ${factsOpen ? "" : "aether-facts-wrap--collapsed"}`}>
         <SessionFactsPanel
           facts={engine.facts}
           flashFields={engine.flashFields}
