@@ -1,65 +1,125 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import "./dashboard.css";
+import { useChatEngine } from "./_hooks/use-chat-engine";
+import { STAGE_LABELS } from "./_constants/dashboard";
+import { Sidebar } from "./_components/sidebar";
+import { ChatThread } from "./_components/chat-thread";
+import { ChatInput } from "./_components/chat-input";
+import { SessionFactsPanel } from "./_components/session-facts";
+
+export default function AetherDashboard() {
+  const engine = useChatEngine();
+  const showWelcome = !engine.hasStarted;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <div className="aether-dashboard">
+      {/* ─── Left Sidebar ─── */}
+      <Sidebar
+        activeNav={engine.activeNav}
+        onNavChange={engine.setActiveNav}
+      />
+
+      {/* ─── Chat Panel ─── */}
+      <main className={`aether-chat ${showWelcome ? "aether-chat--welcome" : ""}`}>
+        {showWelcome ? (
+          <>
+            {/* ─── Centered Welcome Hero ─── */}
+            <div className="welcome-hero">
+              <div className="welcome-hero__monogram">A</div>
+              <h1 className="welcome-hero__title">Aether</h1>
+              <p className="welcome-hero__sub">
+                Navigate medical bills with clarity.
+                <br />
+                <span className="welcome-hero__sub--muted">
+                  Upload, analyze &amp; negotiate — step by step.
+                </span>
+              </p>
+            </div>
+
+            {/* ─── Input (centered, inline) ─── */}
+            <div className="welcome-input-wrap">
+              <ChatInput
+                stage={engine.stage}
+                inputValue={engine.inputValue}
+                textareaRef={engine.textareaRef}
+                onChipClick={engine.handleChipClick}
+                onSend={engine.handleSend}
+                onTextareaChange={engine.handleTextareaChange}
+                onKeyDown={engine.handleKeyDown}
+              />
+            </div>
+
+            {/* ─── Feature cards ─── */}
+            <div className="welcome-features">
+              <div className="welcome-feature-card">
+                <span className="welcome-feature-card__icon">📄</span>
+                <div className="welcome-feature-card__title">Bill Analysis</div>
+                <div className="welcome-feature-card__desc">
+                  Upload your bill and get an instant line-by-line breakdown with fair-price benchmarks.
+                </div>
+              </div>
+              <div className="welcome-feature-card">
+                <span className="welcome-feature-card__icon">💡</span>
+                <div className="welcome-feature-card__title">Savings Finder</div>
+                <div className="welcome-feature-card__desc">
+                  Discover financial assistance programs and negotiation strategies you qualify for.
+                </div>
+              </div>
+              <div className="welcome-feature-card">
+                <span className="welcome-feature-card__icon">📞</span>
+                <div className="welcome-feature-card__title">Call Scripts</div>
+                <div className="welcome-feature-card__desc">
+                  Get a ready-to-use phone script tailored to your exact situation and hospital.
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="aether-chat__topbar">
+              <span key={engine.stage} className="aether-chat__breadcrumb">
+                {STAGE_LABELS[engine.stage]}
+              </span>
+            </div>
+
+            <ChatThread
+              messages={engine.messages}
+              isTyping={engine.isTyping}
+              threadRef={engine.threadRef}
+              engine={engine}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+            <ChatInput
+              stage={engine.stage}
+              inputValue={engine.inputValue}
+              textareaRef={engine.textareaRef}
+              onChipClick={engine.handleChipClick}
+              onSend={engine.handleSend}
+              onTextareaChange={engine.handleTextareaChange}
+              onKeyDown={engine.handleKeyDown}
+            />
+          </>
+        )}
       </main>
+
+      {/* ─── Session Facts Panel ─── */}
+      <SessionFactsPanel
+        facts={engine.facts}
+        flashFields={engine.flashFields}
+        summaryExpanded={engine.summaryExpanded}
+        openSections={engine.openSections}
+        techIdsOpen={engine.techIdsOpen}
+        onToggleSection={(key) =>
+          engine.setOpenSections((prev) => ({
+            ...prev,
+            [key]: !prev[key],
+          }))
+        }
+        onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
+        onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
+        onClearSession={engine.clearSession}
+      />
     </div>
   );
 }
