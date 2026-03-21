@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { ApiError } from "@/src/lib/api";
+import { logInfo } from "@/src/lib/logger";
 import { saveUploadedFile } from "@/src/lib/uploads";
 import { UploadedBillModel } from "@/src/models/uploaded-bill.model";
 
@@ -20,6 +21,15 @@ export const uploadService = {
       status: "uploaded",
     });
 
+    logInfo("upload.service", "upload.created", {
+      sessionId,
+      uploadedBillId: upload._id.toString(),
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      checksum,
+      storagePath,
+    });
+
     return upload;
   },
 
@@ -30,6 +40,13 @@ export const uploadService = {
       throw new ApiError("UPLOAD_NOT_FOUND", "Uploaded bill not found", 404);
     }
 
+    logInfo("upload.service", "upload.loaded", {
+      uploadedBillId,
+      sessionId: upload.sessionId.toString(),
+      status: upload.status,
+      filename: upload.filename,
+    });
+
     return upload;
   },
 
@@ -38,7 +55,7 @@ export const uploadService = {
     status: "uploaded" | "processing" | "processed" | "failed",
     extractedText?: string | null,
   ) {
-    return UploadedBillModel.findByIdAndUpdate(
+    const updated = await UploadedBillModel.findByIdAndUpdate(
       uploadedBillId,
       {
         $set: {
@@ -48,5 +65,14 @@ export const uploadService = {
       },
       { new: true },
     );
+
+    logInfo("upload.service", "upload.status_updated", {
+      uploadedBillId,
+      status,
+      storedExtractedText: extractedText !== undefined,
+      found: Boolean(updated),
+    });
+
+    return updated;
   },
 };

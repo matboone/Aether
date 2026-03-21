@@ -1,5 +1,13 @@
 import { connectToDatabase } from "@/src/lib/db";
 import { fail, ok } from "@/src/lib/api";
+import {
+  createRequestLogContext,
+  logRouteError,
+  logRouteStart,
+  logRouteSuccess,
+  summarizeSessionFacts,
+  summarizeToolEvents,
+} from "@/src/lib/logger";
 import { analysisService } from "@/src/services/analysis.service";
 import { benchmarkService } from "@/src/services/benchmark.service";
 import { hospitalService } from "@/src/services/hospital.service";
@@ -12,12 +20,18 @@ import type { ToolEvent } from "@/src/types/domain";
 export const runtime = "nodejs";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ uploadedBillId: string }> },
 ) {
+  const logContext = createRequestLogContext(request, "/api/bills/[uploadedBillId]/process");
   try {
+    logRouteStart(logContext);
     await connectToDatabase();
     const { uploadedBillId } = await params;
+    logRouteStart(logContext, {
+      phase: "resolved_params",
+      uploadedBillId,
+    });
     const upload = await uploadService.getUploadedBill(uploadedBillId);
     const toolEvents: ToolEvent[] = [];
 
@@ -87,6 +101,15 @@ export async function POST(
 
     const view = await orchestratorService.getSessionView(upload.sessionId.toString());
 
+    logRouteSuccess(logContext, 200, {
+      sessionId: upload.sessionId.toString(),
+      uploadedBillId,
+      parsedBillId: parsed.parsedBillId,
+      analysisId: analysis.analysisId,
+      step: session.step,
+      facts: summarizeSessionFacts(session.facts),
+      toolEvents: summarizeToolEvents(toolEvents),
+    });
     return ok({
       sessionId: upload.sessionId.toString(),
       uploadedBillId,
@@ -98,6 +121,7 @@ export async function POST(
       ui: view.ui,
     });
   } catch (error) {
+    logRouteError(logContext, error);
     return fail(error as Error);
   }
 }

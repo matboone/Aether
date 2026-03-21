@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { ApiError } from "@/src/lib/api";
+import { logInfo } from "@/src/lib/logger";
 import { normalizeText } from "@/src/lib/normalize";
 import { BillAnalysisModel } from "@/src/models/bill-analysis.model";
 import { ParsedBillModel } from "@/src/models/parsed-bill.model";
@@ -147,6 +148,9 @@ export const analysisService = {
   async analyzeBillPricing(input: {
     parsedBillId: string;
   }): Promise<AnalyzeBillPricingOutputDto> {
+    logInfo("analysis.service", "analysis.persisted_started", {
+      parsedBillId: input.parsedBillId,
+    });
     const parsedBill = await ParsedBillModel.findById(input.parsedBillId).lean();
     if (!parsedBill) {
       throw new ApiError("PARSED_BILL_NOT_FOUND", "Parsed bill not found", 404);
@@ -209,6 +213,18 @@ export const analysisService = {
       allItems,
     });
 
+    logInfo("analysis.service", "analysis.persisted_completed", {
+      analysisId: analysis._id.toString(),
+      parsedBillId: input.parsedBillId,
+      sessionId: parsedBill.sessionId.toString(),
+      normalizedItemCount: normalizedItems.length,
+      matchedItemCount: allItems.filter((item) => item.matched).length,
+      unmatchedItemCount: allItems.filter((item) => !item.matched).length,
+      flaggedCount: flaggedItems.length,
+      originalTotal,
+      estimatedOvercharge,
+    });
+
     return {
       analysisId: analysis._id.toString(),
       summary: {
@@ -226,6 +242,11 @@ export const analysisService = {
     if (!analysis) {
       throw new ApiError("ANALYSIS_NOT_FOUND", "Analysis not found", 404);
     }
+    logInfo("analysis.service", "analysis.loaded", {
+      analysisId,
+      flaggedCount: analysis.flaggedItems.length,
+      originalTotal: analysis.originalTotal,
+    });
     return analysis;
   },
 
@@ -235,6 +256,10 @@ export const analysisService = {
       lineItems: ParsedBillLineItem[];
     };
   }) {
+    logInfo("analysis.service", "analysis.transient_started", {
+      lineItemCount: input.parsedBill.lineItems.length,
+      totalAmount: input.parsedBill.totalAmount,
+    });
     const normalizedItems = await classifyParsedBillLineItems(input.parsedBill.lineItems);
     const benchmarks = await ProcedureBenchmarkModel.find().lean();
     const benchmarksByKey = new Map(
@@ -268,7 +293,7 @@ export const analysisService = {
       input.parsedBill.totalAmount ??
       normalizedItems.reduce((sum, item) => sum + item.chargedAmount, 0);
 
-    return {
+    const result = {
       summary: {
         originalTotal,
         flaggedCount: flaggedItems.length,
@@ -286,5 +311,16 @@ export const analysisService = {
           chargedAmount: item.chargedAmount,
         })),
     };
+
+    logInfo("analysis.service", "analysis.transient_completed", {
+      normalizedItemCount: normalizedItems.length,
+      matchedItemCount: result.allItems.filter((item) => item.matched).length,
+      unmatchedItemCount: result.unmatchedItems.length,
+      flaggedCount: result.summary.flaggedCount,
+      originalTotal: result.summary.originalTotal,
+      estimatedOvercharge: result.summary.estimatedOvercharge,
+    });
+
+    return result;
   },
 };

@@ -21,6 +21,7 @@ const parsedBillSchema = new Schema(
     hospitalName: { type: String, default: null },
     totalAmount: { type: Number, default: null },
     phoneNumber: { type: String, default: null },
+    email: { type: String, default: null },
     sourceType: {
       type: String,
       enum: ["itemized_statement", "summary_bill", "unknown"],

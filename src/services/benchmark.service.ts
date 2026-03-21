@@ -1,4 +1,5 @@
 import { ProcedureBenchmarkModel } from "@/src/models/procedure-benchmark.model";
+import { logInfo } from "@/src/lib/logger";
 import { inferCategory, normalizeKey, normalizeText } from "@/src/lib/normalize";
 import { ParsedBillModel } from "@/src/models/parsed-bill.model";
 import { ApiError } from "@/src/lib/api";
@@ -7,6 +8,11 @@ import type {
   ProcedureBenchmarkDocument,
 } from "@/src/types/domain";
 import type { ClassifyBillItemsOutputDto } from "@/src/types/dto";
+
+export function extractEmbeddedProcedureCode(label: string): string | null {
+  const match = label.match(/\b(\d{5})\b/);
+  return match?.[1] ?? null;
+}
 
 function benchmarkToLeanMatch(benchmark: {
   normalizedKey: string;
@@ -42,13 +48,22 @@ export const benchmarkService = {
       | null;
   }> {
     const labelNormalized = normalizeText(input.label);
+    const embeddedCode = extractEmbeddedProcedureCode(input.label);
+    const lookupCode = input.code ?? embeddedCode;
 
-    if (input.code) {
+    if (lookupCode) {
       const codeMatch = await ProcedureBenchmarkModel.findOne({
-        code: input.code,
+        code: lookupCode,
       }).lean();
 
       if (codeMatch) {
+        logInfo("benchmark.service", "procedure.matched", {
+          label: input.label,
+          lookupCode,
+          matchType: "code",
+          normalizedKey: codeMatch.normalizedKey,
+          category: codeMatch.category,
+        });
         return {
           normalizedKey: codeMatch.normalizedKey,
           category: codeMatch.category,
@@ -62,6 +77,13 @@ export const benchmarkService = {
       normalizedKey: exactKey,
     }).lean();
     if (exactMatch) {
+      logInfo("benchmark.service", "procedure.matched", {
+        label: input.label,
+        lookupCode,
+        matchType: "normalized_key",
+        normalizedKey: exactMatch.normalizedKey,
+        category: exactMatch.category,
+      });
       return {
         normalizedKey: exactMatch.normalizedKey,
         category: exactMatch.category,
@@ -77,6 +99,13 @@ export const benchmarkService = {
     );
 
     if (keywordMatch) {
+      logInfo("benchmark.service", "procedure.matched", {
+        label: input.label,
+        lookupCode,
+        matchType: "keyword",
+        normalizedKey: keywordMatch.normalizedKey,
+        category: keywordMatch.category,
+      });
       return {
         normalizedKey: keywordMatch.normalizedKey,
         category: keywordMatch.category,
@@ -84,6 +113,12 @@ export const benchmarkService = {
       };
     }
 
+    logInfo("benchmark.service", "procedure.unmatched", {
+      label: input.label,
+      lookupCode,
+      normalizedKey: exactKey,
+      category: inferCategory(input.label),
+    });
     return {
       normalizedKey: exactKey,
       category: inferCategory(input.label),
@@ -94,6 +129,9 @@ export const benchmarkService = {
   async classifyBillItems(input: {
     parsedBillId: string;
   }): Promise<ClassifyBillItemsOutputDto> {
+    logInfo("benchmark.service", "classification.started", {
+      parsedBillId: input.parsedBillId,
+    });
     const parsedBill = await ParsedBillModel.findById(input.parsedBillId).lean();
     if (!parsedBill) {
       throw new ApiError("PARSED_BILL_NOT_FOUND", "Parsed bill not found", 404);
@@ -109,12 +147,18 @@ export const benchmarkService = {
         return {
           label: item.rawLabel,
           normalizedKey: match.normalizedKey,
-          code: item.code ?? null,
+          code: item.code ?? extractEmbeddedProcedureCode(item.rawLabel),
           chargedAmount: item.amount ?? 0,
           category: match.category,
         };
       }),
     );
+
+    logInfo("benchmark.service", "classification.completed", {
+      parsedBillId: input.parsedBillId,
+      itemCount: normalizedItems.length,
+      categories: normalizedItems.map((item) => item.category),
+    });
 
     return { normalizedItems };
   },

@@ -1,6 +1,7 @@
 import { TextractClient, AnalyzeDocumentCommand } from "@aws-sdk/client-textract";
 import { Types } from "mongoose";
 import { env, hasTextractConfig } from "@/src/lib/env";
+import { logInfo, logWarn, summarizeText } from "@/src/lib/logger";
 import { normalizeText } from "@/src/lib/normalize";
 import { readUploadAsBuffer } from "@/src/lib/uploads";
 import { ParsedBillModel } from "@/src/models/parsed-bill.model";
@@ -26,6 +27,7 @@ interface ParserResult {
   hospitalName: string | null;
   totalAmount: number | null;
   phoneNumber: string | null;
+  email: string | null;
   lineItems: ParsedBillLineItem[];
   sourceType: ParsedBillSourceType;
   fallbackUsed?: boolean;
@@ -51,6 +53,8 @@ function buildFallbackParseResult(text?: string | null): ParserResult {
       : null,
     phoneNumber:
       sourceText?.match(/(\d{3}[-.)\s]\d{3}[-.\s]\d{4})/)?.[1] ?? null,
+    email:
+      sourceText?.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i)?.[0] ?? null,
     sourceType: "unknown",
     lineItems: sourceText
       ? sourceText
@@ -116,6 +120,7 @@ class DemoSeededParser implements BillParser {
         hospitalName: matchedTemplate.hospitalName,
         totalAmount: matchedTemplate.totalAmount,
         phoneNumber: matchedTemplate.phoneNumber,
+        email: matchedTemplate.email ?? null,
         lineItems: matchedTemplate.lineItems,
         sourceType: matchedTemplate.sourceType,
         parserMode: "demo",
@@ -167,6 +172,7 @@ class TextractParser implements BillParser {
         hospitalName: templateMatch.hospitalName,
         totalAmount: templateMatch.totalAmount,
         phoneNumber: templateMatch.phoneNumber,
+        email: templateMatch.email ?? null,
         lineItems: templateMatch.lineItems,
         sourceType: templateMatch.sourceType,
         parserMode: "textract",
@@ -205,6 +211,7 @@ class TextractParser implements BillParser {
 
     const totalAmountMatch = text.match(/total(?: due| amount)?[:\s$]+([\d,.]+)/i);
     const phoneMatch = text.match(/(\d{3}[-.)\s]\d{3}[-.\s]\d{4})/);
+    const emailMatch = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
     const hospitalLine = lines[0] ?? null;
 
     return {
@@ -213,6 +220,7 @@ class TextractParser implements BillParser {
         ? Number(totalAmountMatch[1].replace(/,/g, ""))
         : null,
       phoneNumber: phoneMatch?.[1] ?? null,
+      email: emailMatch?.[0] ?? null,
       lineItems: lineItems.map((item) => ({
         rawLabel: item.rawLabel,
         amount: item.amount,
@@ -239,10 +247,23 @@ export const parserService = {
   async extractBillDocument(input: {
     uploadedBillId: string;
   }): Promise<ExtractBillDocumentOutputDto & { toolEvents: ToolEvent[] }> {
+    logInfo("parser.service", "parse.persisted_started", {
+      uploadedBillId: input.uploadedBillId,
+      configuredParserMode: env.parserMode(),
+      hasTextractConfig: hasTextractConfig(),
+    });
     const uploadedBill = await UploadedBillModel.findById(input.uploadedBillId);
     if (!uploadedBill) {
       throw new Error("Uploaded bill not found");
     }
+
+    logInfo("parser.service", "parse.upload_loaded", {
+      uploadedBillId: input.uploadedBillId,
+      sessionId: uploadedBill.sessionId.toString(),
+      filename: uploadedBill.filename,
+      mimeType: uploadedBill.mimeType,
+      checksum: uploadedBill.checksum,
+    });
 
     const bytes = await readUploadAsBuffer(uploadedBill.storagePath);
     const preferredParser = getPreferredParser();
@@ -256,6 +277,10 @@ export const parserService = {
     });
 
     if (parsed.fallbackUsed) {
+      logWarn("parser.service", "parse.fallback_used", {
+        uploadedBillId: input.uploadedBillId,
+        parserMode: parsed.parserMode,
+      });
       toolEvents.push({
         tool: "extractBillDocument",
         status: "fallback",
@@ -264,6 +289,11 @@ export const parserService = {
     }
 
     if (parsed.parserMode !== env.parserMode()) {
+      logWarn("parser.service", "parse.mode_fallback", {
+        uploadedBillId: input.uploadedBillId,
+        configuredParserMode: env.parserMode(),
+        actualParserMode: parsed.parserMode,
+      });
       toolEvents.push({
         tool: "extractBillDocument",
         status: "fallback",
@@ -275,6 +305,12 @@ export const parserService = {
       parsed.parserMode === "textract" &&
       (!parsed.lineItems.length || !parsed.hospitalName)
     ) {
+      logWarn("parser.service", "parse.textract_incomplete", {
+        uploadedBillId: input.uploadedBillId,
+        lineItemCount: parsed.lineItems.length,
+        hospitalName: parsed.hospitalName,
+        extractedTextPreview: summarizeText(parsed.text),
+      });
       parsed = await demoParser.parse({
         filename: uploadedBill.filename,
         mimeType: uploadedBill.mimeType,
@@ -295,6 +331,7 @@ export const parserService = {
       hospitalName: parsed.hospitalName,
       totalAmount: parsed.totalAmount,
       phoneNumber: parsed.phoneNumber,
+      email: parsed.email,
       sourceType: parsed.sourceType,
       lineItems: parsed.lineItems.map((item) => ({
         rawLabel: item.rawLabel,
@@ -303,11 +340,24 @@ export const parserService = {
       })),
     });
 
+    logInfo("parser.service", "parse.persisted_completed", {
+      uploadedBillId: input.uploadedBillId,
+      parsedBillId: created._id.toString(),
+      parserMode: parsed.parserMode,
+      sourceType: created.sourceType,
+      hospitalName: created.hospitalName,
+      totalAmount: created.totalAmount,
+      phoneNumber: created.phoneNumber,
+      email: created.email,
+      lineItemCount: created.lineItems.length,
+    });
+
     return {
       parsedBillId: created._id.toString(),
       hospitalName: created.hospitalName,
       totalAmount: created.totalAmount,
       phoneNumber: created.phoneNumber,
+      email: created.email,
       lineItems: created.lineItems,
       sourceType: created.sourceType,
       toolEvents,
@@ -315,6 +365,13 @@ export const parserService = {
   },
 
   async extractTransientBill(file: File) {
+    logInfo("parser.service", "parse.transient_started", {
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      size: file.size,
+      configuredParserMode: env.parserMode(),
+      hasTextractConfig: hasTextractConfig(),
+    });
     const bytes = Buffer.from(await file.arrayBuffer());
     const parser = getPreferredParser();
     let parsed = await parser.parse({
@@ -324,6 +381,9 @@ export const parserService = {
     });
 
     if (parsed.parserMode === "textract" && !parsed.lineItems.length) {
+      logWarn("parser.service", "parse.transient_textract_incomplete", {
+        filename: file.name,
+      });
       parsed = await demoParser.parse({
         filename: file.name,
         mimeType: file.type || "application/octet-stream",
@@ -331,10 +391,21 @@ export const parserService = {
       });
     }
 
+    logInfo("parser.service", "parse.transient_completed", {
+      filename: file.name,
+      parserMode: parsed.parserMode,
+      sourceType: parsed.sourceType,
+      hospitalName: parsed.hospitalName,
+      totalAmount: parsed.totalAmount,
+      phoneNumber: parsed.phoneNumber,
+      email: parsed.email,
+      lineItemCount: parsed.lineItems.length,
+    });
     return {
       hospitalName: parsed.hospitalName,
       totalAmount: parsed.totalAmount,
       phoneNumber: parsed.phoneNumber,
+      email: parsed.email,
       lineItems: parsed.lineItems,
       sourceType: parsed.sourceType,
     };
