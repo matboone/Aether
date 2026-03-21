@@ -1,55 +1,134 @@
 "use client";
 
 import React from "react";
-import { Info, ChevronDown, TrendingDown } from "lucide-react";
+import {
+  Building2,
+  User,
+  FileText,
+  ShieldCheck,
+  Target,
+  ChevronDown,
+  TrendingDown,
+  Hash,
+  Trash2,
+} from "lucide-react";
 import type { SessionFacts, InsuranceStatus } from "@/app/_types/dashboard";
 
-/* ─── Sub-components ─── */
+/* ─── Modular Fact Card ─── */
 
-function FactsSection({
+function FactCard({
+  icon: Icon,
   label,
   isOpen,
   onToggle,
+  status,
   children,
 }: {
+  readonly icon: React.ElementType;
   readonly label: string;
   readonly isOpen: boolean;
   readonly onToggle: () => void;
+  readonly status?: "filled" | "partial" | "empty";
   readonly children: React.ReactNode;
 }) {
+  const statusClass = status ? `fact-card--${status}` : "";
   return (
-    <div className="facts-section">
+    <div className={`fact-card ${statusClass}`}>
       <button
         type="button"
-        className="facts-section__header"
+        className="fact-card__header"
         onClick={onToggle}
         aria-expanded={isOpen}
       >
-        <span className="facts-section__label">{label}</span>
+        <div className="fact-card__icon-wrap">
+          <Icon size={14} />
+        </div>
+        <span className="fact-card__label">{label}</span>
+        {status === "filled" && <span className="fact-card__dot fact-card__dot--filled" />}
+        {status === "partial" && <span className="fact-card__dot fact-card__dot--partial" />}
         <ChevronDown
-          className={`facts-section__chevron ${isOpen ? "facts-section__chevron--open" : ""}`}
+          size={12}
+          className={`fact-card__chevron ${isOpen ? "fact-card__chevron--open" : ""}`}
         />
       </button>
-      {isOpen && <div className="facts-section__content">{children}</div>}
+      <div className={`fact-card__body ${isOpen ? "fact-card__body--open" : ""}`}>
+        {isOpen && children}
+      </div>
     </div>
   );
 }
 
-function FactEmpty({ label }: { readonly label: string }) {
+function FactRow({
+  label,
+  flash,
+  children,
+}: {
+  readonly label: string;
+  readonly flash?: boolean;
+  readonly children: React.ReactNode;
+}) {
   return (
-    <>
-      <span className="fact-row__label">{label}</span>
-      <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-    </>
+    <div className={`fact-kv ${flash ? "fact-kv--flash" : ""}`}>
+      <span className="fact-kv__key">{label}</span>
+      <span className="fact-kv__val">{children}</span>
+    </div>
   );
 }
 
-function InsuranceBadge({ status }: { readonly status: InsuranceStatus }) {
-  if (status === "insured")
-    return <span className="fact-badge fact-badge--secondary">Insured</span>;
-  if (status === "uninsured")
-    return <span className="fact-badge fact-badge--error">Uninsured</span>;
-  return <span className="fact-badge fact-badge--muted">Unknown</span>;
+function Badge({
+  variant,
+  pulse,
+  children,
+}: {
+  readonly variant: "primary" | "success" | "error" | "muted";
+  readonly pulse?: boolean;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <span className={`fact-pill fact-pill--${variant} ${pulse ? "fact-pill--pulse" : ""}`}>
+      {children}
+    </span>
+  );
+}
+
+function MonoChip({ children }: { readonly children: React.ReactNode }) {
+  return <span className="fact-mono">{children}</span>;
+}
+
+function InsuranceTag({ status }: { readonly status: InsuranceStatus }) {
+  if (status === "insured") return <Badge variant="success">Insured</Badge>;
+  if (status === "uninsured") return <Badge variant="error">Uninsured</Badge>;
+  return <Badge variant="muted">Unknown</Badge>;
+}
+
+function EmptyVal() {
+  return <span className="fact-kv__empty">&mdash;</span>;
+}
+
+/* ─── Section fill-status helpers ─── */
+
+function getProviderStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+  if (f.hospitalName && f.hospitalId) return "filled";
+  if (f.hospitalName || f.hospitalId) return "partial";
+  return "empty";
+}
+function getPatientStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+  if (f.hasInsurance && f.incidentSummary) return "filled";
+  if (f.hasInsurance || f.incidentSummary) return "partial";
+  return "empty";
+}
+function getBillStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+  if (f.estimatedBillTotal && f.parsedBillId && f.analysisId) return "filled";
+  if (f.estimatedBillTotal || f.uploadedBillId) return "partial";
+  return "empty";
+}
+function getEligibilityStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+  if (f.assistanceEligible === "likely" || f.assistanceEligible === "unlikely") return "filled";
+  if (f.incomeBracket || f.assistanceEligible === "checking") return "partial";
+  return "empty";
+}
+function getResolutionStatus(f: SessionFacts): "filled" | "empty" {
+  return f.negotiationOutcome ? "filled" : "empty";
 }
 
 /* ─── Main component ─── */
@@ -78,121 +157,90 @@ export function SessionFactsPanel({
   onClearSession,
 }: SessionFactsProps) {
   return (
-    <aside className="aether-facts">
-      <div className="facts-header">
-        <div className="facts-header__title">
-          Session Facts <Info size={14} />
-        </div>
-        <div className="facts-header__sub">Collected as we talk</div>
+    <aside className="facts-panel">
+      {/* Panel header */}
+      <div className="facts-panel__head">
+        <span className="facts-panel__title">Session Context</span>
+        <span className="facts-panel__subtitle">Auto-collected from chat</span>
       </div>
 
-      {/* SECTION 1 — Provider */}
-      <FactsSection
-        label="PROVIDER"
-        isOpen={openSections.provider}
-        onToggle={() => onToggleSection("provider")}
-      >
-        <div
-          className={`fact-row ${flashFields.has("hospitalName") ? "fact-row--flash" : ""}`}
+      {/* Cards */}
+      <div className="facts-panel__cards">
+        {/* ─ Provider ─ */}
+        <FactCard
+          icon={Building2}
+          label="Provider"
+          isOpen={openSections.provider}
+          onToggle={() => onToggleSection("provider")}
+          status={getProviderStatus(facts)}
         >
-          {facts.hospitalName ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <div className="monogram monogram--sm">
-                {facts.hospitalName
-                  .split(" ")
-                  .map((w) => w[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
+          <FactRow label="Hospital" flash={flashFields.has("hospitalName")}>
+            {facts.hospitalName ? (
+              <div className="fact-hospital">
+                <span className="fact-hospital__mono">
+                  {facts.hospitalName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                </span>
+                <span className="fact-kv__val--bold">{facts.hospitalName}</span>
               </div>
-              <span className="fact-row__value fact-row__value--important">
-                {facts.hospitalName}
-              </span>
-            </div>
-          ) : (
-            <FactEmpty label="Hospital" />
-          )}
-        </div>
-        <div
-          className={`fact-row ${flashFields.has("hospitalId") ? "fact-row--flash" : ""}`}
-        >
-          {facts.hospitalId ? (
-            <span className="fact-mono-chip">{facts.hospitalId}</span>
-          ) : (
-            <FactEmpty label="Hospital ID" />
-          )}
-        </div>
-      </FactsSection>
+            ) : (
+              <EmptyVal />
+            )}
+          </FactRow>
+          <FactRow label="System ID" flash={flashFields.has("hospitalId")}>
+            {facts.hospitalId ? <MonoChip>{facts.hospitalId}</MonoChip> : <EmptyVal />}
+          </FactRow>
+        </FactCard>
 
-      {/* SECTION 2 — Patient Context */}
-      <FactsSection
-        label="PATIENT CONTEXT"
-        isOpen={openSections.patient}
-        onToggle={() => onToggleSection("patient")}
-      >
-        <div
-          className={`fact-row ${flashFields.has("hasInsurance") ? "fact-row--flash" : ""}`}
+        {/* ─ Patient ─ */}
+        <FactCard
+          icon={User}
+          label="Patient"
+          isOpen={openSections.patient}
+          onToggle={() => onToggleSection("patient")}
+          status={getPatientStatus(facts)}
         >
-          <span className="fact-row__label">Insurance</span>
-          {facts.hasInsurance ? (
-            <InsuranceBadge status={facts.hasInsurance} />
-          ) : (
-            <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-          )}
-        </div>
-        <div
-          className={`fact-row ${flashFields.has("incidentSummary") ? "fact-row--flash" : ""}`}
-          style={{ flexDirection: "column", alignItems: "flex-start" }}
-        >
-          <span className="fact-row__label">Summary</span>
-          {facts.incidentSummary ? (
-            <>
-              <div
-                className={`fact-summary ${summaryExpanded ? "fact-summary--expanded" : ""}`}
-              >
-                {facts.incidentSummary}
-              </div>
-              <button className="show-more-link" onClick={onToggleSummary}>
-                {summaryExpanded ? "Show less" : "Show more"}
-              </button>
-            </>
-          ) : (
-            <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-          )}
-        </div>
-      </FactsSection>
+          <FactRow label="Insurance" flash={flashFields.has("hasInsurance")}>
+            {facts.hasInsurance ? <InsuranceTag status={facts.hasInsurance} /> : <EmptyVal />}
+          </FactRow>
+          <div className={`fact-kv ${flashFields.has("incidentSummary") ? "fact-kv--flash" : ""}`} style={{ flexDirection: "column", alignItems: "stretch" }}>
+            <span className="fact-kv__key">Summary</span>
+            {facts.incidentSummary ? (
+              <>
+                <p className={`fact-summary-text ${summaryExpanded ? "fact-summary-text--open" : ""}`}>
+                  {facts.incidentSummary}
+                </p>
+                <button className="fact-link" onClick={onToggleSummary}>
+                  {summaryExpanded ? "Less" : "More"}
+                </button>
+              </>
+            ) : (
+              <EmptyVal />
+            )}
+          </div>
+        </FactCard>
 
-      {/* SECTION 3 — Bill */}
-      <FactsSection
-        label="BILL"
-        isOpen={openSections.bill}
-        onToggle={() => onToggleSection("bill")}
-      >
-        <div
-          className={`fact-row ${flashFields.has("estimatedBillTotal") ? "fact-row--flash" : ""}`}
+        {/* ─ Bill ─ */}
+        <FactCard
+          icon={FileText}
+          label="Bill"
+          isOpen={openSections.bill}
+          onToggle={() => onToggleSection("bill")}
+          status={getBillStatus(facts)}
         >
-          {facts.estimatedBillTotal ? (
-            <span className="fact-row__value fact-row__value--display">
-              {facts.estimatedBillTotal}
-            </span>
-          ) : (
-            <FactEmpty label="Estimated Total" />
-          )}
-        </div>
+          <FactRow label="Total" flash={flashFields.has("estimatedBillTotal")}>
+            {facts.estimatedBillTotal ? (
+              <span className="fact-kv__val--display">{facts.estimatedBillTotal}</span>
+            ) : (
+              <EmptyVal />
+            )}
+          </FactRow>
 
-        {/* Technical IDs sub-section */}
-        <div style={{ marginTop: "0.5rem" }}>
           <button
-            className="show-more-link"
+            className="fact-link"
             onClick={onToggleTechIds}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.25rem",
-              fontSize: "0.65rem",
-            }}
+            style={{ display: "flex", alignItems: "center", gap: "0.25rem", margin: "0.25rem 0" }}
           >
-            Technical IDs{" "}
+            <Hash size={10} /> IDs
             <ChevronDown
               size={10}
               style={{
@@ -202,177 +250,88 @@ export function SessionFactsPanel({
             />
           </button>
           {techIdsOpen && (
-            <div className="tech-ids">
-              <div
-                className={`fact-row ${flashFields.has("uploadedBillId") ? "fact-row--flash" : ""}`}
-              >
-                <span className="fact-row__label">Upload</span>
-                {facts.uploadedBillId ? (
-                  <span className="fact-mono-chip">{facts.uploadedBillId}</span>
-                ) : (
-                  <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-                )}
-              </div>
-              <div
-                className={`fact-row ${flashFields.has("parsedBillId") ? "fact-row--flash" : ""}`}
-              >
-                <span className="fact-row__label">Parsed</span>
-                {facts.parsedBillId ? (
-                  <span className="fact-mono-chip">{facts.parsedBillId}</span>
-                ) : (
-                  <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-                )}
-              </div>
-              <div
-                className={`fact-row ${flashFields.has("analysisId") ? "fact-row--flash" : ""}`}
-              >
-                <span className="fact-row__label">Analysis</span>
-                {facts.analysisId ? (
-                  <span className="fact-mono-chip">{facts.analysisId}</span>
-                ) : (
-                  <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-                )}
-              </div>
+            <div className="fact-ids-grid">
+              <FactRow label="Upload" flash={flashFields.has("uploadedBillId")}>
+                {facts.uploadedBillId ? <MonoChip>{facts.uploadedBillId}</MonoChip> : <EmptyVal />}
+              </FactRow>
+              <FactRow label="Parsed" flash={flashFields.has("parsedBillId")}>
+                {facts.parsedBillId ? <MonoChip>{facts.parsedBillId}</MonoChip> : <EmptyVal />}
+              </FactRow>
+              <FactRow label="Analysis" flash={flashFields.has("analysisId")}>
+                {facts.analysisId ? <MonoChip>{facts.analysisId}</MonoChip> : <EmptyVal />}
+              </FactRow>
             </div>
           )}
-        </div>
-      </FactsSection>
+        </FactCard>
 
-      {/* SECTION 4 — Eligibility */}
-      <FactsSection
-        label="ELIGIBILITY"
-        isOpen={openSections.eligibility}
-        onToggle={() => onToggleSection("eligibility")}
-      >
-        <div
-          className={`fact-row ${flashFields.has("incomeBracket") ? "fact-row--flash" : ""}`}
+        {/* ─ Eligibility ─ */}
+        <FactCard
+          icon={ShieldCheck}
+          label="Eligibility"
+          isOpen={openSections.eligibility}
+          onToggle={() => onToggleSection("eligibility")}
+          status={getEligibilityStatus(facts)}
         >
-          <span className="fact-row__label">Income</span>
-          {facts.incomeBracket ? (
-            <span className="fact-badge fact-badge--primary">{facts.incomeBracket}</span>
+          <FactRow label="Income" flash={flashFields.has("incomeBracket")}>
+            {facts.incomeBracket ? <Badge variant="primary">{facts.incomeBracket}</Badge> : <EmptyVal />}
+          </FactRow>
+          <FactRow label="Household" flash={flashFields.has("householdSize")}>
+            {facts.householdSize ? <Badge variant="primary">{facts.householdSize}</Badge> : <EmptyVal />}
+          </FactRow>
+          <FactRow label="Status" flash={flashFields.has("assistanceEligible")}>
+            {facts.assistanceEligible === "likely" && <Badge variant="success">Likely Eligible</Badge>}
+            {facts.assistanceEligible === "unlikely" && <Badge variant="error">Likely Ineligible</Badge>}
+            {facts.assistanceEligible === "checking" && <Badge variant="primary" pulse>Checking…</Badge>}
+            {!facts.assistanceEligible && <EmptyVal />}
+          </FactRow>
+        </FactCard>
+
+        {/* ─ Resolution ─ */}
+        <FactCard
+          icon={Target}
+          label="Resolution"
+          isOpen={openSections.resolution}
+          onToggle={() => onToggleSection("resolution")}
+          status={getResolutionStatus(facts)}
+        >
+          {facts.negotiationOutcome ? (
+            <>
+              <FactRow label="Original" flash={flashFields.has("negotiationOutcome")}>
+                <span className="fact-kv__val--num">
+                  ${facts.negotiationOutcome.original.toLocaleString()}
+                </span>
+              </FactRow>
+              <FactRow label="Reduced">
+                <span className="fact-kv__val--num fact-kv__val--green">
+                  <TrendingDown size={12} />
+                  ${facts.negotiationOutcome.reduced.toLocaleString()}
+                </span>
+              </FactRow>
+              <div className="fact-savings">
+                Saved ${(facts.negotiationOutcome.original - facts.negotiationOutcome.reduced).toLocaleString()}
+              </div>
+              <FactRow label="Plan">
+                {facts.negotiationOutcome.paymentPlan ? (
+                  <Badge variant="success">Yes</Badge>
+                ) : (
+                  <Badge variant="muted">No</Badge>
+                )}
+              </FactRow>
+              {facts.negotiationOutcome.notes && (
+                <p className="fact-note">{facts.negotiationOutcome.notes}</p>
+              )}
+            </>
           ) : (
-            <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-          )}
-        </div>
-        <div
-          className={`fact-row ${flashFields.has("householdSize") ? "fact-row--flash" : ""}`}
-        >
-          <span className="fact-row__label">Household</span>
-          {facts.householdSize ? (
-            <span className="fact-badge fact-badge--primary">{facts.householdSize}</span>
-          ) : (
-            <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-          )}
-        </div>
-        <div
-          className={`fact-row ${flashFields.has("assistanceEligible") ? "fact-row--flash" : ""}`}
-        >
-          <span className="fact-row__label">Eligible</span>
-          {facts.assistanceEligible === "likely" && (
-            <span className="fact-badge fact-badge--secondary">Likely Eligible</span>
-          )}
-          {facts.assistanceEligible === "unlikely" && (
-            <span className="fact-badge fact-badge--error">Likely Ineligible</span>
-          )}
-          {facts.assistanceEligible === "checking" && (
-            <span className="fact-badge fact-badge--primary fact-badge--pulse">
-              Checking…
+            <span className="fact-kv__empty" style={{ fontSize: "0.7rem" }}>
+              Not yet resolved
             </span>
           )}
-          {!facts.assistanceEligible && (
-            <span className="fact-row__value fact-row__value--empty">&mdash;</span>
-          )}
-        </div>
-      </FactsSection>
+        </FactCard>
+      </div>
 
-      {/* SECTION 5 — Resolution */}
-      <FactsSection
-        label="RESOLUTION"
-        isOpen={openSections.resolution}
-        onToggle={() => onToggleSection("resolution")}
-      >
-        {facts.negotiationOutcome ? (
-          <>
-            <div
-              className={`fact-row ${flashFields.has("negotiationOutcome") ? "fact-row--flash" : ""}`}
-            >
-              <span className="fact-row__label">Original</span>
-              <span
-                className="fact-row__value"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                ${facts.negotiationOutcome.original.toLocaleString()}
-              </span>
-            </div>
-            <div className="fact-row">
-              <span className="fact-row__label">Reduced</span>
-              <span
-                className="fact-row__value"
-                style={{
-                  color: "var(--clr-secondary)",
-                  fontVariantNumeric: "tabular-nums",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                }}
-              >
-                <TrendingDown size={12} />$
-                {facts.negotiationOutcome.reduced.toLocaleString()}
-              </span>
-            </div>
-            <div className="fact-row">
-              <span className="fact-row__label">Saved</span>
-              <span
-                className="fact-row__value fact-row__value--important"
-                style={{ color: "var(--clr-secondary)" }}
-              >
-                Saved: $
-                {(
-                  facts.negotiationOutcome.original -
-                  facts.negotiationOutcome.reduced
-                ).toLocaleString()}
-              </span>
-            </div>
-            <div className="fact-row">
-              <span className="fact-row__label">Plan</span>
-              {facts.negotiationOutcome.paymentPlan ? (
-                <span className="fact-badge fact-badge--secondary">Yes</span>
-              ) : (
-                <span className="fact-badge fact-badge--muted">No</span>
-              )}
-            </div>
-            <div
-              className="fact-row"
-              style={{ flexDirection: "column", alignItems: "flex-start" }}
-            >
-              <span className="fact-row__label">Notes</span>
-              <span
-                className="fact-row__value"
-                style={{
-                  fontStyle: "italic",
-                  color: "var(--clr-text-muted)",
-                  fontSize: "0.8rem",
-                }}
-              >
-                {facts.negotiationOutcome.notes}
-              </span>
-            </div>
-          </>
-        ) : (
-          <span
-            className="fact-row__value"
-            style={{
-              color: "var(--clr-text-muted)",
-              fontSize: "0.7rem",
-              fontWeight: 500,
-            }}
-          >
-            Not yet resolved
-          </span>
-        )}
-      </FactsSection>
-
-      <button className="clear-session-btn" onClick={onClearSession}>
+      {/* Clear */}
+      <button className="facts-panel__clear" onClick={onClearSession}>
+        <Trash2 size={12} />
         Clear Session
       </button>
     </aside>
