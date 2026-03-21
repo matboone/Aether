@@ -95,7 +95,7 @@
 
 .aether-dashboard {
   display: flex;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
   background: var(--clr-surface);
@@ -193,6 +193,29 @@
 .aether-chat__topbar {
   padding: 1rem 1.25rem 0.625rem 2rem;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.aether-chat__back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--clr-surface-low);
+  color: var(--clr-text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.aether-chat__back-btn:hover {
+  background: var(--clr-surface-high);
+  color: var(--clr-text);
 }
 
 .aether-chat__breadcrumb {
@@ -268,13 +291,13 @@
 }
 
 .msg-bubble--ai {
-  max-width: 82%;
+  max-width: 75%;
   background: var(--clr-surface-low);
   border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
 }
 
 .msg-bubble--user {
-  max-width: 72%;
+  max-width: 75%;
   background: var(--gradient-primary);
   border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
   color: var(--clr-on-primary);
@@ -1288,13 +1311,45 @@
 
 /* ─── Session Facts Panel ─── */
 
+/* ─── Facts Panel Wrapper (collapsible) ─── */
+
+.aether-facts-wrap {
+  display: flex;
+  flex-shrink: 0;
+  width: 220px;
+  transition: width 250ms ease;
+  overflow: hidden;
+}
+
+.aether-facts-wrap--collapsed {
+  width: 0;
+}
+
+.facts-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--clr-text-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+  align-self: stretch;
+}
+
+.facts-toggle-btn:hover {
+  color: var(--clr-text);
+}
+
 .aether-facts {
-  width: 280px;
-  min-width: 280px;
+  width: 220px;
+  min-width: 220px;
   height: 100vh;
   background: var(--clr-surface-container);
   overflow-y: auto;
-  padding: 1.25rem;
+  padding: 1rem;
   flex-shrink: 0;
 }
 

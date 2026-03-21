@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
 import { STAGE_LABELS } from "./_constants/dashboard";
@@ -7,10 +8,12 @@ import { Sidebar } from "./_components/sidebar";
 import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
+import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
   const showWelcome = !engine.hasStarted;
+  const [factsOpen, setFactsOpen] = useState(true);
 
   return (
     <div className="aether-dashboard">
@@ -78,6 +81,13 @@ export default function AetherDashboard() {
         ) : (
           <>
             <div className="aether-chat__topbar">
+              <button
+                className="aether-chat__back-btn"
+                onClick={engine.clearSession}
+                aria-label="Back to home"
+              >
+                <ArrowLeft size={18} />
+              </button>
               <span key={engine.stage} className="aether-chat__breadcrumb">
                 {STAGE_LABELS[engine.stage]}
               </span>
@@ -103,23 +113,34 @@ export default function AetherDashboard() {
         )}
       </main>
 
+      {/* ─── Facts Toggle ─── */}
+      <button
+        className="facts-toggle-btn"
+        onClick={() => setFactsOpen((prev) => !prev)}
+        aria-label={factsOpen ? "Hide session facts" : "Show session facts"}
+      >
+        {factsOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      </button>
+
       {/* ─── Session Facts Panel ─── */}
-      <SessionFactsPanel
-        facts={engine.facts}
-        flashFields={engine.flashFields}
-        summaryExpanded={engine.summaryExpanded}
-        openSections={engine.openSections}
-        techIdsOpen={engine.techIdsOpen}
-        onToggleSection={(key) =>
-          engine.setOpenSections((prev) => ({
-            ...prev,
-            [key]: !prev[key],
-          }))
-        }
-        onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
-        onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
-        onClearSession={engine.clearSession}
-      />
+      <div className={`aether-facts-wrap ${factsOpen ? "" : "aether-facts-wrap--collapsed"}`}>
+        <SessionFactsPanel
+          facts={engine.facts}
+          flashFields={engine.flashFields}
+          summaryExpanded={engine.summaryExpanded}
+          openSections={engine.openSections}
+          techIdsOpen={engine.techIdsOpen}
+          onToggleSection={(key) =>
+            engine.setOpenSections((prev) => ({
+              ...prev,
+              [key]: !prev[key],
+            }))
+          }
+          onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
+          onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
+          onClearSession={engine.clearSession}
+        />
+      </div>
     </div>
   );
 }
