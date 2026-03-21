@@ -293,7 +293,7 @@ export function useChatEngine(): ChatEngine {
         id: "bill-processing",
         sender: "ai",
         text: "I\u2019ve received your bill. Let me extract the details and run it against our fair-pricing database. This will just take a moment.",
-        modules: ["bill-receipt", "bill-summary"],
+        modules: ["bill-summary"],
       });
       setTimeout(() => {
         setAnalysisReady(true);
