@@ -1,20 +1,27 @@
 "use client";
 
-/* ═══════════════════════════════════════════════════════
-   Aether — Chat Engine Hook
-   All state management & business logic for the dashboard
-   ═══════════════════════════════════════════════════════ */
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import type {
-  Stage,
-  Message,
-  SessionFacts,
-} from "@/app/_types/dashboard";
+  ChatMessageResponseDto,
+  CreateSessionResponseDto,
+  ProcessBillResponseDto,
+  UploadBillResponseDto,
+} from "@/src/types/dto";
+import type {
+  RenderableSessionUi,
+  SessionFacts as DomainSessionFacts,
+  SessionStep,
+} from "@/src/types/domain";
+import type { Stage, Message, ModuleType, SessionFacts } from "@/app/_types/dashboard";
 import { EMPTY_FACTS } from "@/app/_constants/dashboard";
 
+interface ProfileInfo {
+  accountId: string | null;
+  accountName: string;
+  status: string;
+}
+
 export interface ChatEngine {
-  /* State */
   stage: Stage;
   messages: Message[];
   facts: SessionFacts;
@@ -32,14 +39,18 @@ export interface ChatEngine {
   openSections: Record<string, boolean>;
   techIdsOpen: boolean;
   hasStarted: boolean;
+  sessionId: string | null;
+  backendUi: RenderableSessionUi | null;
+  isUploading: boolean;
+  uploadFilename: string | null;
+  uploadSizeLabel: string | null;
+  profile: ProfileInfo;
 
-  /* Refs */
   threadRef: React.RefObject<HTMLDivElement | null>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 
-  /* Actions */
   handleSend: (text?: string) => void;
-  handleUpload: () => void;
+  handleUpload: (file: File) => void;
   handleIncomeConfirm: () => void;
   handleChipClick: (text: string) => void;
   handleTextareaChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -53,6 +64,144 @@ export interface ChatEngine {
   setActiveNav: (v: number) => void;
   setOpenSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setTechIdsOpen: (v: boolean) => void;
+}
+
+const MODULE_ORDER: ModuleType[] = [
+  "upload",
+  "bill-summary",
+  "line-items",
+  "income-selector",
+  "eligibility",
+  "action-plan",
+  "doc-chips",
+  "phone-script",
+  "resolution",
+];
+
+function formatCurrency(value: number | null | undefined): string | null {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function mapSessionStepToStage(step: SessionStep): Stage {
+  switch (step) {
+    case "NEW":
+    case "INTAKE":
+      return "INTRO";
+    case "AWAITING_BILL_UPLOAD":
+      return "BILL_UPLOAD";
+    case "BILL_UPLOADED":
+    case "BILL_PARSED":
+      return "BILL_PROCESSING";
+    case "BILL_ANALYZED":
+      return "ANALYSIS_COMPLETE";
+    case "AWAITING_INCOME":
+      return "INCOME_CHECK";
+    case "STRATEGY_READY":
+      return "ACTION_PLAN";
+    case "NEGOTIATION_IN_PROGRESS":
+      return "SCRIPT_GENERATED";
+    case "RESOLUTION_RECORDED":
+    case "COMPLETE":
+      return "RESOLVED";
+    case "ERROR":
+      return "ITEMIZED_EXPLAIN";
+    default:
+      return "INTRO";
+  }
+}
+
+function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts): SessionFacts {
+  let hasInsurance: SessionFacts["hasInsurance"] = null;
+  if (facts.hasInsurance === true) hasInsurance = "insured";
+  if (facts.hasInsurance === false) hasInsurance = "uninsured";
+
+  let assistanceEligible: SessionFacts["assistanceEligible"] = null;
+  if (facts.assistanceEligible === true) assistanceEligible = "likely";
+  if (facts.assistanceEligible === false) assistanceEligible = "unlikely";
+
+  const originalAmount = facts.negotiationOutcome?.originalAmount ?? facts.estimatedBillTotal ?? null;
+  const reducedAmount = facts.negotiationOutcome?.reducedAmount ?? null;
+
+  return {
+    hospitalName: facts.hospitalName ?? null,
+    hospitalId: facts.hospitalId ?? null,
+    hasInsurance,
+    incidentSummary: facts.incidentSummary ?? null,
+    estimatedBillTotal: formatCurrency(facts.estimatedBillTotal) ?? null,
+    uploadedBillId: facts.uploadedBillId ?? null,
+    parsedBillId: facts.parsedBillId ?? null,
+    analysisId: facts.analysisId ?? null,
+    incomeBracket: facts.incomeBracket ?? null,
+    householdSize: facts.householdSize ?? null,
+    assistanceEligible,
+    negotiationOutcome:
+      originalAmount !== null || reducedAmount !== null
+        ? {
+            original: originalAmount ?? 0,
+            reduced: reducedAmount ?? 0,
+            paymentPlan: Boolean(facts.negotiationOutcome?.paymentPlanOffered),
+            notes: facts.negotiationOutcome?.notes ?? "",
+          }
+        : null,
+  };
+}
+
+function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
+  const set = new Set<ModuleType>();
+
+  if (ui.canUploadBill) set.add("upload");
+  if (ui.analysisSummary) {
+    set.add("bill-summary");
+    if ((ui.flaggedItems?.length ?? 0) > 0) {
+      set.add("line-items");
+    }
+  }
+  if (step === "AWAITING_INCOME") {
+    set.add("income-selector");
+  }
+  if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
+    set.add("eligibility");
+  }
+  if (ui.negotiationPlan) {
+    set.add("action-plan");
+    set.add("doc-chips");
+    set.add("phone-script");
+    if (ui.negotiationPlan.assistanceAssessment) {
+      set.add("eligibility");
+    }
+  }
+  if (ui.resolutionSummary) {
+    set.add("resolution");
+  }
+
+  return MODULE_ORDER.filter((moduleType) => set.has(moduleType));
+}
+
+function toIncomeInputBracket(input: string): string {
+  const lower = input.toLowerCase();
+  if (lower.includes("under") || lower.includes("25") || lower.includes("40") || lower.includes("60")) {
+    return "0_50k";
+  }
+  if (lower.includes("60") || lower.includes("80")) {
+    return "50k_80k";
+  }
+  if (lower.includes("prefer")) {
+    return "80k_plus";
+  }
+  if (lower.includes("80") || lower.includes("plus")) {
+    return "80k_plus";
+  }
+  return "50k_80k";
+}
+
+function shortAccount(sessionId: string | null): string {
+  if (!sessionId) return "Not started";
+  return `ACCT-${sessionId.slice(-6).toUpperCase()}`;
 }
 
 export function useChatEngine(): ChatEngine {
@@ -79,11 +228,118 @@ export function useChatEngine(): ChatEngine {
   });
   const [techIdsOpen, setTechIdsOpen] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [backendUi, setBackendUi] = useState<RenderableSessionUi | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadFilename, setUploadFilename] = useState<string | null>(null);
+  const [uploadSizeLabel, setUploadSizeLabel] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const factsRef = useRef<SessionFacts>(facts);
+  const sessionIdRef = useRef<string | null>(sessionId);
 
-  /* ─── Auto-expand cards when data fills in ─── */
+  useEffect(() => {
+    factsRef.current = facts;
+  }, [facts]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const flashFact = useCallback((field: string) => {
+    setFlashFields((prev) => new Set(prev).add(field));
+    setTimeout(() => {
+      setFlashFields((prev) => {
+        const next = new Set(prev);
+        next.delete(field);
+        return next;
+      });
+    }, 650);
+  }, []);
+
+  const applyServerState = useCallback(
+    (
+      nextStep: SessionStep,
+      domainFacts: DomainSessionFacts,
+      ui: RenderableSessionUi,
+      sid: string,
+    ) => {
+      setSessionId(sid);
+      setStage(mapSessionStepToStage(nextStep));
+      setBackendUi(ui);
+      setAnalysisReady(Boolean(ui.analysisSummary));
+      setUploaded(Boolean(domainFacts.uploadedBillId));
+
+      const mapped = mapDomainFactsToDashboardFacts(domainFacts);
+      const previous = factsRef.current;
+      const changed = Object.keys(mapped).filter((key) => {
+        const typedKey = key as keyof SessionFacts;
+        return JSON.stringify(previous[typedKey]) !== JSON.stringify(mapped[typedKey]);
+      });
+      setFacts(mapped);
+      changed.forEach((key) => flashFact(key));
+
+      if (domainFacts.incomeBracket) {
+        setSelectedIncome(domainFacts.incomeBracket);
+        setIncomeConfirmed(true);
+      }
+    },
+    [flashFact],
+  );
+
+  const createSession = useCallback(async (): Promise<CreateSessionResponseDto> => {
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error("Unable to create session");
+    }
+    return response.json() as Promise<CreateSessionResponseDto>;
+  }, []);
+
+  const ensureSession = useCallback(async (): Promise<string> => {
+    if (sessionIdRef.current) return sessionIdRef.current;
+    const created = await createSession();
+    applyServerState(created.step, created.facts, created.ui, created.sessionId);
+    return created.sessionId;
+  }, [applyServerState, createSession]);
+
+  useEffect(() => {
+    let canceled = false;
+    const bootstrap = async () => {
+      try {
+        const created = await createSession();
+        if (canceled) return;
+        applyServerState(created.step, created.facts, created.ui, created.sessionId);
+      } catch {
+        if (!canceled) {
+          setMessages([
+            {
+              id: `boot-error-${Date.now()}`,
+              sender: "ai",
+              text: "I couldn’t initialize your session yet. You can still type a message and I’ll retry.",
+            },
+          ]);
+        }
+      }
+    };
+    void bootstrap();
+    return () => {
+      canceled = true;
+    };
+  }, [applyServerState, createSession]);
+
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTo({
+        top: threadRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages, isTyping]);
+
   useEffect(() => {
     const sectionHasData: Record<string, boolean> = {
       provider: !!(facts.hospitalName || facts.hospitalId),
@@ -105,279 +361,162 @@ export function useChatEngine(): ChatEngine {
     });
   }, [facts]);
 
-  /* ─── Scroll to bottom on new messages ─── */
-  useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTo({
-        top: threadRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages, isTyping]);
-
-  /* ─── Flash a session fact field ─── */
-  const flashFact = useCallback((field: string) => {
-    setFlashFields((prev) => new Set(prev).add(field));
-    setTimeout(() => {
-      setFlashFields((prev) => {
-        const next = new Set(prev);
-        next.delete(field);
-        return next;
-      });
-    }, 650);
+  const addMessage = useCallback((msg: Message) => {
+    setMessages((prev) => [...prev, msg]);
   }, []);
 
-  /* ─── Helpers ─── */
-  const addMessage = useCallback(
-    (msg: Message) => setMessages((prev) => [...prev, msg]),
-    []
-  );
+  const sendChat = useCallback(
+    async (
+      content: string,
+      options?: {
+        factPatch?: Partial<DomainSessionFacts>;
+        incomeInput?: {
+          incomeBracket?: string | null;
+          incomeAmount?: number | null;
+          householdSize?: number | null;
+        };
+      },
+    ) => {
+      const sid = await ensureSession();
+      const response = await fetch("/api/chat/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sid,
+          content,
+          factPatch: options?.factPatch,
+          incomeInput: options?.incomeInput,
+        }),
+      });
 
-  const showTypingThenMessage = useCallback(
-    (msg: Message, delay = 1400) => {
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        addMessage(msg);
-      }, delay);
+      if (!response.ok) {
+        throw new Error("Unable to send message");
+      }
+
+      const data = (await response.json()) as ChatMessageResponseDto;
+      applyServerState(data.step, data.facts, data.ui, data.sessionId);
+
+      addMessage({
+        id: `ai-${Date.now()}`,
+        sender: "ai",
+        text: data.assistantMessage,
+        modules: nextModules(data.step, data.ui, data.facts),
+      });
     },
-    [addMessage]
+    [addMessage, applyServerState, ensureSession],
   );
 
-  /* ─── Handle user input / chip clicks ─── */
   const handleSend = useCallback(
     (text?: string) => {
       const msg = text ?? inputValue.trim();
       if (!msg) return;
       setInputValue("");
+      if (!hasStarted) setHasStarted(true);
 
-      /* First message transitions from welcome hero to chat */
-      if (!hasStarted) {
-        setHasStarted(true);
-      }
+      addMessage({ id: `user-${Date.now()}`, sender: "user", text: msg });
 
-      const userMsg: Message = {
-        id: `user-${Date.now()}`,
-        sender: "user",
-        text: msg,
+      const run = async () => {
+        try {
+          setIsTyping(true);
+          await sendChat(msg);
+        } catch {
+          addMessage({
+            id: `ai-error-${Date.now()}`,
+            sender: "ai",
+            text: "I hit a connection issue while sending that. Please retry.",
+          });
+        } finally {
+          setIsTyping(false);
+        }
       };
-      addMessage(userMsg);
 
-      switch (stage) {
-        case "INTRO": {
-          setStage("HOSPITAL_ID");
-          showTypingThenMessage({
-            id: "ask-hospital",
-            sender: "ai",
-            text: "I\u2019d love to help with that. First, can you tell me which hospital or health system sent you this bill? If you have the bill handy, the name should be right at the top.",
-          });
-          break;
-        }
-        case "HOSPITAL_ID": {
-          const name = msg.toLowerCase().includes("tristar")
-            ? "TriStar Medical Center"
-            : msg;
-          setFacts((f) => ({
-            ...f,
-            hospitalName: name,
-            hospitalId: "HCA-TS-4821",
-          }));
-          flashFact("hospitalName");
-          flashFact("hospitalId");
-          setStage("INSURANCE_CHECK");
-          showTypingThenMessage({
-            id: "ask-insurance",
-            sender: "ai",
-            text: `Got it \u2014 ${name}. That\u2019s part of the HCA Healthcare network, which actually has some of the more generous financial assistance programs available. Now, do you currently have health insurance, or were you uninsured when this visit happened?`,
-          });
-          break;
-        }
-        case "INSURANCE_CHECK": {
-          const lower = msg.toLowerCase();
-          let status: "insured" | "uninsured" | "unknown" = "unknown";
-          let summary = "";
-          if (lower.includes("no ") || lower.includes("uninsured")) {
-            status = "uninsured";
-            summary =
-              "Emergency visit, currently uninsured, received bill from TriStar Medical Center";
-          } else if (lower.includes("insured") || lower.includes("have")) {
-            status = lower.includes("under") ? "uninsured" : "insured";
-            summary =
-              "Medical visit with insurance concerns, bill from TriStar Medical Center";
-          }
-          setFacts((f) => ({
-            ...f,
-            hasInsurance: status,
-            incidentSummary: summary || `Patient reported: \u201C${msg}\u201D`,
-          }));
-          flashFact("hasInsurance");
-          flashFact("incidentSummary");
-          setStage("BILL_UPLOAD");
-          showTypingThenMessage({
-            id: "ask-upload",
-            sender: "ai",
-            text: "Thank you for sharing that. This is important information that will help us find the best path forward. Now, let\u2019s take a look at your bill. If you have a photo or PDF, go ahead and upload it below. I\u2019ll extract all the details automatically.",
-            modules: ["upload"],
-          });
-          break;
-        }
-        case "ITEMIZED_EXPLAIN": {
-          setStage("BILL_UPLOAD");
-          showTypingThenMessage({
-            id: "explain-itemized",
-            sender: "ai",
-            text: "An itemized bill lists every single charge separately, like a detailed receipt. Hospitals are required to provide one if you ask. Don\u2019t worry though \u2014 you can upload whatever bill you have right now, and we\u2019ll work with it. If we need the itemized version later, I\u2019ll help you request one.",
-            modules: ["upload"],
-          });
-          break;
-        }
-        case "ANALYSIS_COMPLETE": {
-          setStage("INCOME_CHECK");
-          showTypingThenMessage({
-            id: "ask-income",
-            sender: "ai",
-            text: "Now let\u2019s check if you might qualify for financial assistance. TriStar\u2019s HCA charity care program can reduce or even eliminate your bill entirely depending on your household income. This information stays private and is only used to estimate eligibility.",
-            modules: ["income-selector"],
-          });
-          break;
-        }
-        case "ELIGIBILITY_RESULT": {
-          setStage("ACTION_PLAN");
-          showTypingThenMessage(
-            {
-              id: "action-plan",
-              sender: "ai",
-              text: "Here\u2019s a concrete plan to get this resolved. I\u2019ve organized the steps in priority order, and I\u2019ve started generating the documents you\u2019ll need for each one.",
-              modules: ["action-plan", "doc-chips"],
-            },
-            1600
-          );
-          break;
-        }
-        case "ACTION_PLAN": {
-          setStage("SCRIPT_GENERATED");
-          showTypingThenMessage(
-            {
-              id: "script-gen",
-              sender: "ai",
-              text: "I\u2019ve put together a word-for-word call script tailored to TriStar\u2019s billing department. This covers exactly what to say, how to ask for financial assistance, and what to do if they push back.",
-              modules: ["phone-script"],
-            },
-            1600
-          );
-          break;
-        }
-        case "SCRIPT_GENERATED": {
-          setStage("RESOLVED");
-          const outcome = {
-            original: 6000,
-            reduced: 450,
-            paymentPlan: true,
-            notes:
-              "Charity care waiver approved for 92.5% of balance. Remaining $450 eligible for 24-month interest-free payment plan.",
-          };
-          setFacts((f) => ({ ...f, negotiationOutcome: outcome }));
-          flashFact("negotiationOutcome");
-          showTypingThenMessage(
-            {
-              id: "resolved",
-              sender: "ai",
-              text: "Wonderful news. Based on the charity care application, TriStar has approved a near-complete waiver of your bill. Here\u2019s the final breakdown of your resolution.",
-              modules: ["resolution"],
-            },
-            1800
-          );
-          break;
-        }
-        default:
-          break;
-      }
+      void run();
     },
-    [inputValue, stage, hasStarted, addMessage, showTypingThenMessage, flashFact]
+    [addMessage, hasStarted, inputValue, sendChat],
   );
 
-  /* ─── Handle upload simulation ─── */
-  const handleUpload = useCallback(() => {
-    setUploaded(true);
-    setStage("BILL_PROCESSING");
-    setFacts((f) => ({
-      ...f,
-      uploadedBillId: "bill_upl_89211",
-      estimatedBillTotal: "$6,000.00",
-    }));
-    flashFact("uploadedBillId");
-    flashFact("estimatedBillTotal");
+  const handleUpload = useCallback(
+    (file: File) => {
+      const run = async () => {
+        try {
+          setIsUploading(true);
+          const sid = await ensureSession();
+          const formData = new FormData();
+          formData.append("sessionId", sid);
+          formData.append("file", file);
 
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      addMessage({
-        id: "bill-processing",
-        sender: "ai",
-        text: "I\u2019ve received your bill. Let me extract the details and run it against our fair-pricing database. This will just take a moment.",
-        modules: ["bill-summary"],
-      });
-      setTimeout(() => {
-        setAnalysisReady(true);
-        setFacts((f) => ({
-          ...f,
-          parsedBillId: "prs_bill_89211",
-          analysisId: "anl_89211_v2",
-        }));
-        flashFact("parsedBillId");
-        flashFact("analysisId");
-        setStage("ANALYSIS_COMPLETE");
-
-        setTimeout(() => {
-          addMessage({
-            id: "analysis-done",
-            sender: "ai",
-            text: "The analysis is complete. I found a few charges that look unusual \u2014 one possible duplicate and two items that appear significantly higher than typical rates. Here\u2019s the detailed breakdown.",
-            modules: ["line-items"],
+          const uploadResponse = await fetch("/api/bills/upload", {
+            method: "POST",
+            body: formData,
           });
-        }, 800);
-      }, 2000);
-    }, 1400);
-  }, [addMessage, flashFact]);
+          if (!uploadResponse.ok) throw new Error("Upload failed");
+          const uploadData = (await uploadResponse.json()) as UploadBillResponseDto;
 
-  /* ─── Handle income confirmation ─── */
+          setUploadFilename(uploadData.filename);
+          setUploadSizeLabel(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+          setUploaded(true);
+          flashFact("uploadedBillId");
+
+          setIsTyping(true);
+          const processResponse = await fetch(`/api/bills/${uploadData.uploadedBillId}/process`, {
+            method: "POST",
+          });
+          if (!processResponse.ok) throw new Error("Processing failed");
+          const processData = (await processResponse.json()) as ProcessBillResponseDto;
+          applyServerState(processData.step, processData.facts, processData.ui, processData.sessionId);
+
+          await sendChat(`I uploaded ${uploadData.filename}.`);
+        } catch {
+          addMessage({
+            id: `ai-upload-error-${Date.now()}`,
+            sender: "ai",
+            text: "I couldn’t process that file. Please try uploading again.",
+          });
+        } finally {
+          setIsTyping(false);
+          setIsUploading(false);
+        }
+      };
+
+      void run();
+    },
+    [addMessage, applyServerState, ensureSession, flashFact, sendChat],
+  );
+
   const handleIncomeConfirm = useCallback(() => {
     if (!selectedIncome) return;
-    setIncomeConfirmed(true);
-    setFacts((f) => ({
-      ...f,
-      incomeBracket: selectedIncome,
-      householdSize,
-      assistanceEligible: "checking",
-    }));
-    flashFact("incomeBracket");
-    flashFact("householdSize");
 
-    const userMsg: Message = {
+    setIncomeConfirmed(true);
+    const userText = `My household income is ${selectedIncome} (household size: ${householdSize})`;
+    addMessage({
       id: `user-income-${Date.now()}`,
       sender: "user",
-      text: `My household income is ${selectedIncome} (household size: ${householdSize})`,
+      text: userText,
+    });
+
+    const run = async () => {
+      try {
+        setIsTyping(true);
+        await sendChat(userText, {
+          incomeInput: {
+            incomeBracket: toIncomeInputBracket(selectedIncome),
+            householdSize,
+          },
+        });
+      } catch {
+        addMessage({
+          id: `ai-income-error-${Date.now()}`,
+          sender: "ai",
+          text: "I couldn’t save your income details right now. Please retry.",
+        });
+      } finally {
+        setIsTyping(false);
+      }
     };
-    addMessage(userMsg);
 
-    setTimeout(() => {
-      setFacts((f) => ({ ...f, assistanceEligible: "likely" }));
-      flashFact("assistanceEligible");
-    }, 800);
+    void run();
+  }, [addMessage, householdSize, selectedIncome, sendChat]);
 
-    setStage("ELIGIBILITY_RESULT");
-    showTypingThenMessage(
-      {
-        id: "eligibility-result",
-        sender: "ai",
-        text: "Great news \u2014 based on what you\u2019ve shared, it looks like you have a strong case for financial assistance.",
-        modules: ["eligibility"],
-      },
-      1600
-    );
-  }, [selectedIncome, householdSize, addMessage, showTypingThenMessage, flashFact]);
-
-  /* ─── Clear session ─── */
   const clearSession = useCallback(() => {
     setStage("INTRO");
     setMessages([]);
@@ -395,28 +534,42 @@ export function useChatEngine(): ChatEngine {
     setOpenSections({ provider: false, patient: false, bill: false, eligibility: false, resolution: false });
     setTechIdsOpen(false);
     setHasStarted(false);
-  }, []);
+    setBackendUi(null);
+    setSessionId(null);
+    setUploadFilename(null);
+    setUploadSizeLabel(null);
 
-  /* ─── Chip click handler ─── */
+    const run = async () => {
+      try {
+        const created = await createSession();
+        applyServerState(created.step, created.facts, created.ui, created.sessionId);
+      } catch {
+        addMessage({
+          id: `ai-reset-error-${Date.now()}`,
+          sender: "ai",
+          text: "A new session will be created when you send your next message.",
+        });
+      }
+    };
+
+    void run();
+  }, [addMessage, applyServerState, createSession]);
+
   const handleChipClick = useCallback(
     (text: string) => {
       setInputValue(text);
       setTimeout(() => handleSend(text), 200);
     },
-    [handleSend]
+    [handleSend],
   );
 
-  /* ─── Textarea auto-resize ─── */
-  const handleTextareaChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setInputValue(e.target.value);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 96)}px`;
-      }
-    },
-    []
-  );
+  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 96)}px`;
+    }
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -425,7 +578,7 @@ export function useChatEngine(): ChatEngine {
         handleSend();
       }
     },
-    [handleSend]
+    [handleSend],
   );
 
   return {
@@ -446,6 +599,16 @@ export function useChatEngine(): ChatEngine {
     openSections,
     techIdsOpen,
     hasStarted,
+    sessionId,
+    backendUi,
+    isUploading,
+    uploadFilename,
+    uploadSizeLabel,
+    profile: {
+      accountId: sessionId,
+      accountName: shortAccount(sessionId),
+      status: stage.replaceAll("_", " "),
+    },
     threadRef,
     textareaRef,
     handleSend,

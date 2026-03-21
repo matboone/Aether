@@ -6,6 +6,11 @@ import { useState } from "react";
 interface SettingsDialogProps {
   readonly open: boolean;
   readonly onClose: () => void;
+  readonly profile: {
+    accountId: string | null;
+    accountName: string;
+    status: string;
+  };
 }
 
 function ToggleSwitch({
@@ -28,7 +33,7 @@ function ToggleSwitch({
   );
 }
 
-export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
+export function SettingsDialog({ open, onClose, profile }: SettingsDialogProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
@@ -37,10 +42,21 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   if (!open) return null;
 
   return (
-    <div className="settings-overlay" onClick={onClose}>
+    <div
+      className="settings-overlay"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      role="button"
+      tabIndex={0}
+    >
       <div
         className="settings-dialog"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         {/* Header */}
         <div className="settings-dialog__header">
@@ -56,6 +72,18 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
         {/* Sections */}
         <div className="settings-dialog__body">
+          <div className="settings-section">
+            <div className="settings-section__label">Profile</div>
+            <div className="settings-profile">
+              <div className="settings-profile__avatar">{profile.accountName.slice(0, 1)}</div>
+              <div>
+                <div className="settings-profile__name">{profile.accountName}</div>
+                <div className="settings-profile__meta">{profile.accountId ?? "No account yet"}</div>
+                <div className="settings-profile__meta">Status: {profile.status}</div>
+              </div>
+            </div>
+          </div>
+
           {/* Appearance */}
           <div className="settings-section">
             <div className="settings-section__label">Appearance</div>

@@ -7,9 +7,11 @@ interface SidebarProps {
   readonly activeNav: number;
   readonly onNavChange: (idx: number) => void;
   readonly onOpenSettings: () => void;
+  readonly profileName: string;
+  readonly profileStatus: string;
 }
 
-export function Sidebar({ activeNav, onNavChange, onOpenSettings }: SidebarProps) {
+export function Sidebar({ activeNav, onNavChange, onOpenSettings, profileName, profileStatus }: SidebarProps) {
   return (
     <aside className="aether-sidebar">
       <div className="aether-sidebar__monogram">A</div>
@@ -36,6 +38,11 @@ export function Sidebar({ activeNav, onNavChange, onOpenSettings }: SidebarProps
           </button>
         </div>
       </nav>
+
+      <button className="aether-sidebar__profile" onClick={onOpenSettings} title={`${profileName} · ${profileStatus}`}>
+        <span className="aether-sidebar__profile-avatar">{profileName.slice(0, 1)}</span>
+        <span className="aether-sidebar__profile-dot" />
+      </button>
     </aside>
   );
 }

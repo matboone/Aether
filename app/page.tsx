@@ -32,6 +32,8 @@ export default function AetherDashboard() {
         activeNav={engine.activeNav}
         onNavChange={engine.setActiveNav}
         onOpenSettings={() => setSettingsOpen(true)}
+        profileName={engine.profile.accountName}
+        profileStatus={engine.profile.status}
       />
 
       {/* ─── Chat Panel ─── */}
@@ -155,7 +157,11 @@ export default function AetherDashboard() {
       </div>
 
       {/* ─── Settings Dialog ─── */}
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        profile={engine.profile}
+      />
     </div>
   );
 }

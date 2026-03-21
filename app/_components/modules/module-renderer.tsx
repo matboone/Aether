@@ -219,6 +219,13 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
 
   const [loading, setLoading] = useState(loadDelay > 0);
 
+  let inferredEligible: boolean | null = null;
+  if (engine.facts.assistanceEligible === "likely") {
+    inferredEligible = true;
+  } else if (engine.facts.assistanceEligible === "unlikely") {
+    inferredEligible = false;
+  }
+
   useEffect(() => {
     if (loadDelay <= 0) return;
     const timer = setTimeout(() => setLoading(false), loadDelay);
@@ -244,7 +251,13 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
     case "upload":
       return (
         <div className="module-card" style={cardStyle({ padding: 0 })}>
-          <UploadZone uploaded={engine.uploaded} onUpload={engine.handleUpload} />
+          <UploadZone
+            uploaded={engine.uploaded}
+            uploading={engine.isUploading}
+            filename={engine.uploadFilename}
+            sizeLabel={engine.uploadSizeLabel}
+            onUpload={engine.handleUpload}
+          />
         </div>
       );
     case "bill-receipt":
@@ -259,7 +272,12 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
           className="module-card"
           style={cardStyle({ padding: 0, overflow: "hidden" })}
         >
-          <BillSummary analysisReady={engine.analysisReady} />
+          <BillSummary
+            analysisReady={engine.analysisReady}
+            hospitalName={engine.facts.hospitalName}
+            totalAmount={engine.backendUi?.analysisSummary?.originalTotal ?? null}
+            analysisSummary={engine.backendUi?.analysisSummary}
+          />
         </div>
       );
     case "line-items":
@@ -268,6 +286,8 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
           <LineItemsTable
             showMore={engine.showMoreItems}
             onShowMore={() => engine.setShowMoreItems(true)}
+            flaggedItems={engine.backendUi?.flaggedItems ?? []}
+            analysisSummary={engine.backendUi?.analysisSummary}
           />
         </div>
       );
@@ -287,31 +307,38 @@ export function ModuleRenderer({ moduleType, idx, engine }: ModuleRendererProps)
     case "eligibility":
       return (
         <div className="module-card" style={cardStyle({ animationDelay: `${delay + 200}ms` })}>
-          <EligibilityCard />
+          <EligibilityCard
+            eligible={engine.backendUi?.negotiationPlan?.assistanceAssessment?.likelyEligible ?? inferredEligible}
+            assessment={engine.backendUi?.negotiationPlan?.assistanceAssessment ?? null}
+            hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
+          />
         </div>
       );
     case "action-plan":
       return (
         <div className="module-card" style={cardStyle()}>
-          <ActionPlan />
+          <ActionPlan nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />
         </div>
       );
     case "doc-chips":
       return (
         <div className="module-card" style={cardStyle({ animationDelay: `${delay + 160}ms` })}>
-          <DocChips />
+          <DocChips nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />
         </div>
       );
     case "phone-script":
       return (
         <div className="module-card" style={cardStyle({ padding: 0 })}>
-          <PhoneScript />
+          <PhoneScript
+            hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName}
+            lines={engine.backendUi?.negotiationPlan?.phoneScript ?? []}
+          />
         </div>
       );
     case "resolution":
       return (
         <div className="module-card" style={cardStyle()}>
-          <ResolutionSummary />
+          <ResolutionSummary summary={engine.backendUi?.resolutionSummary ?? null} />
         </div>
       );
     default:

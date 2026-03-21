@@ -1,20 +1,37 @@
 "use client";
 
+import { useRef } from "react";
 import { UploadCloud, FileText, Check } from "lucide-react";
 
 interface UploadZoneProps {
   readonly uploaded: boolean;
-  readonly onUpload: () => void;
+  readonly uploading: boolean;
+  readonly filename: string | null;
+  readonly sizeLabel: string | null;
+  readonly onUpload: (file: File) => void;
 }
 
-export function UploadZone({ uploaded, onUpload }: UploadZoneProps) {
+export function UploadZone({ uploaded, uploading, filename, sizeLabel, onUpload }: UploadZoneProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleChooseFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+    onUpload(selected);
+    event.target.value = "";
+  };
+
   if (uploaded) {
     return (
       <div className="bill-receipt">
         <FileText size={20} className="bill-receipt__icon" />
         <div className="bill-receipt__info">
-          <div className="bill-receipt__name">TriStar_Invoice_89211.pdf</div>
-          <div className="bill-receipt__size">2.4 MB</div>
+          <div className="bill-receipt__name">{filename ?? "Uploaded bill"}</div>
+          <div className="bill-receipt__size">{sizeLabel ?? "Uploaded"}</div>
         </div>
         <div className="bill-receipt__badge">
           <Check size={12} /> Uploaded
@@ -24,20 +41,23 @@ export function UploadZone({ uploaded, onUpload }: UploadZoneProps) {
   }
 
   return (
-    <button
-      type="button"
-      className="upload-zone"
-      onClick={onUpload}
-    >
+    <button type="button" className="upload-zone" onClick={handleChooseFile} disabled={uploading}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,image/*"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+      />
       <div className="upload-zone__icon">
         <UploadCloud size={28} />
       </div>
-      <div className="upload-zone__title">Drop your bill here</div>
+      <div className="upload-zone__title">{uploading ? "Uploading bill…" : "Drop your bill here"}</div>
       <div className="upload-zone__sub">
         PDF or photo &mdash; we&apos;ll extract everything
       </div>
       <span className="btn-primary">
-        Choose File
+        {uploading ? "Uploading…" : "Choose File"}
       </span>
     </button>
   );
