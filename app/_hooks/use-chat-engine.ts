@@ -15,6 +15,23 @@ import type {
 import type { Stage, Message, ModuleType, SessionFacts } from "@/app/_types/dashboard";
 import { EMPTY_FACTS, SUGGESTION_CHIPS } from "@/app/_constants/dashboard";
 
+/** Server stores normalized brackets; income pills use INCOME_OPTIONS labels */
+const SERVER_INCOME_BRACKET_TO_UI_LABEL: Record<string, string> = {
+  "0_50k": "$40k\u2013$60k",
+  "50k_80k": "$60k\u2013$80k",
+  "80k_plus": "$80k+",
+};
+
+/** Pill label → API bracket (must stay in sync with app/_constants/dashboard INCOME_OPTIONS) */
+const UI_LABEL_TO_SERVER_BRACKET: Record<string, string> = {
+  "Under $25k": "0_50k",
+  "$25k\u2013$40k": "0_50k",
+  "$40k\u2013$60k": "0_50k",
+  "$60k\u2013$80k": "50k_80k",
+  "$80k+": "80k_plus",
+  "Prefer not to say": "80k_plus",
+};
+
 interface ProfileInfo {
   accountId: string | null;
   accountName: string;
@@ -80,7 +97,6 @@ const MODULE_ORDER: ModuleType[] = [
   "income-selector",
   "eligibility",
   "action-plan",
-  "doc-chips",
   "phone-script",
   "resolution",
 ];
@@ -176,7 +192,6 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: Renderab
 /* Modules that belong in the right strategy panel instead of inline in chat */
 const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
   "action-plan",
-  "doc-chips",
   "phone-script",
 ]);
 
@@ -192,7 +207,11 @@ function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSe
       set.add("line-items");
     }
   }
-  if (step === "AWAITING_INCOME") {
+  /* Show during bill analysis too — otherwise the UI asks for income before step advances */
+  const awaitingIncomeChoice =
+    !facts.incomeBracket &&
+    (step === "AWAITING_INCOME" || step === "BILL_ANALYZED");
+  if (awaitingIncomeChoice) {
     set.add("income-selector");
   }
   if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
@@ -200,7 +219,6 @@ function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSe
   }
   if (ui.negotiationPlan && strategyStillActive) {
     set.add("action-plan");
-    set.add("doc-chips");
     set.add("phone-script");
     if (ui.negotiationPlan.assistanceAssessment) {
       set.add("eligibility");
@@ -225,20 +243,8 @@ function formatFileSize(bytes: number): string {
 }
 
 function toIncomeInputBracket(input: string): string {
-  const lower = input.toLowerCase();
-  if (lower.includes("under") || lower.includes("25") || lower.includes("40") || lower.includes("60")) {
-    return "0_50k";
-  }
-  if (lower.includes("60") || lower.includes("80")) {
-    return "50k_80k";
-  }
-  if (lower.includes("prefer")) {
-    return "80k_plus";
-  }
-  if (lower.includes("80") || lower.includes("plus")) {
-    return "80k_plus";
-  }
-  return "50k_80k";
+  const trimmed = input.trim();
+  return UI_LABEL_TO_SERVER_BRACKET[trimmed] ?? "0_50k";
 }
 
 function shortAccount(sessionId: string | null): string {
@@ -487,7 +493,8 @@ export function useChatEngine(): ChatEngine {
       changed.forEach((key) => flashFact(key));
 
       if (domainFacts.incomeBracket) {
-        setSelectedIncome(domainFacts.incomeBracket);
+        const raw = domainFacts.incomeBracket;
+        setSelectedIncome(SERVER_INCOME_BRACKET_TO_UI_LABEL[raw] ?? raw);
         setIncomeConfirmed(true);
       }
     },
@@ -525,7 +532,7 @@ export function useChatEngine(): ChatEngine {
             {
               id: `boot-error-${Date.now()}`,
               sender: "ai",
-              text: "I couldn’t initialize your session yet. You can still type a message and I’ll retry.",
+              text: "I couldn’t connect to the server to start your session. This may be a network issue or the database may be unavailable. Type a message and I’ll retry automatically.",
             },
           ]);
         }
@@ -660,11 +667,15 @@ export function useChatEngine(): ChatEngine {
         try {
           setIsTyping(true);
           await sendChat(msg);
-        } catch {
+        } catch (err) {
+          const detail =
+            err instanceof Error && err.message === "Unable to send message"
+              ? "The server returned an error."
+              : "Could not reach the server.";
           addMessage({
             id: `ai-error-${Date.now()}`,
             sender: "ai",
-            text: "I hit a connection issue while sending that. Please retry.",
+            text: `I couldn’t process that message. ${detail} Please try again.`,
           });
         } finally {
           setIsTyping(false);
@@ -732,12 +743,20 @@ export function useChatEngine(): ChatEngine {
           const processData = (await processResponse.json()) as ProcessBillResponseDto;
           applyServerState(processData.step, processData.facts, processData.ui, processData.sessionId);
 
-          await sendChat(`I uploaded ${uploadData.filename}.`);
+          try {
+            await sendChat(`I uploaded ${uploadData.filename}.`);
+          } catch {
+            addMessage({
+              id: `ai-upload-chat-error-${Date.now()}`,
+              sender: "ai",
+              text: "Your bill was processed successfully. I couldn’t generate a response yet — please send a follow-up message.",
+            });
+          }
         } catch {
           addMessage({
             id: `ai-upload-error-${Date.now()}`,
             sender: "ai",
-            text: "I couldn’t process that file. Please try uploading again.",
+            text: "I couldn’t upload or process that file. Please check your connection and try again.",
           });
         } finally {
           setIsTyping(false);
@@ -888,8 +907,14 @@ export function useChatEngine(): ChatEngine {
   );
 
   /* ─── Live-poll session state so facts panel updates in real-time ─── */
+  const ACTIVE_POLL_STEPS: Set<SessionStep> = useMemo(
+    () => new Set(["BILL_UPLOADED", "BILL_PARSED", "BILL_ANALYZED"]),
+    [],
+  );
+
   useEffect(() => {
     if (!sessionId) return;
+    const pollMs = ACTIVE_POLL_STEPS.has(stage as SessionStep) ? 4000 : 10000;
     const interval = setInterval(async () => {
       try {
         const resp = await fetch(`/api/sessions/${sessionId}`);
@@ -899,9 +924,9 @@ export function useChatEngine(): ChatEngine {
       } catch {
         /* silent — best-effort polling */
       }
-    }, 4000);
+    }, pollMs);
     return () => clearInterval(interval);
-  }, [sessionId, applyServerState]);
+  }, [sessionId, stage, applyServerState, ACTIVE_POLL_STEPS]);
 
   return {
     stage,

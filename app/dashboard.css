@@ -48,6 +48,60 @@
   --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
+/* ─── Dark Theme Overrides ─── */
+
+.dark {
+  --clr-surface: #1e1e2e;
+  --clr-surface-container: #181825;
+  --clr-surface-low: #24243a;
+  --clr-surface-high: #313244;
+  --clr-text: #cdd6f4;
+  --clr-text-muted: #a6adc8;
+  --clr-outline: rgba(108, 112, 134, 0.25);
+
+  --clr-primary: #a6e3a1;
+  --clr-primary-end: #a6e3a1;
+  --clr-primary-fixed: rgba(166, 227, 161, 0.12);
+  --clr-on-primary: #1e1e2e;
+
+  --clr-secondary: #94e2d5;
+  --clr-secondary-container: rgba(148, 226, 213, 0.12);
+  --clr-tertiary: #89b4fa;
+  --clr-error: #f38ba8;
+  --clr-error-container: rgba(243, 139, 168, 0.12);
+  --clr-warning-container: rgba(249, 226, 175, 0.12);
+  --clr-warning-text: #f9e2af;
+
+  --gradient-primary: var(--clr-primary);
+
+  --shadow-ambient: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Input bar backdrop in dark mode */
+.dark .aether-input-bar {
+  background: rgba(30, 30, 46, 0.88);
+}
+
+.dark .input-container {
+  background: rgba(30, 30, 46, 0.6);
+}
+
+.dark .welcome-input-wrap .input-container {
+  background: var(--clr-surface-low);
+}
+
+.dark .input-textarea::placeholder {
+  color: rgba(166, 173, 200, 0.4);
+}
+
+.dark .aether-chat__thread::-webkit-scrollbar-thumb,
+.dark .right-panel__content::-webkit-scrollbar-thumb,
+.dark .facts-panel::-webkit-scrollbar-thumb {
+  background: rgba(166, 173, 200, 0.15);
+}
+
 /* ─── Keyframes ─── */
 
 @keyframes fadeSlideIn {
@@ -122,7 +176,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e2dfff;
+  color: #ffffff;
   margin-bottom: 1.25rem;
   flex-shrink: 0;
 }
@@ -696,6 +750,9 @@
   align-items: center;
   gap: 0.625rem;
   margin-bottom: 0.75rem;
+  /* Space below module title / border so “N issues found” isn’t flush against the divider */
+  margin-top: 0.625rem;
+  padding-top: 0.75rem;
 }
 
 .line-items__title {
@@ -797,6 +854,12 @@
 .flag-chip--ok {
   background: var(--clr-secondary-container);
   color: var(--clr-secondary);
+}
+
+/* Flagged line items: one consistent treatment (benchmark / duplicate / etc.) */
+.flag-chip--line-item {
+  background: var(--clr-warning-container);
+  color: var(--clr-warning-text);
 }
 
 .flag-dot {
@@ -2037,7 +2100,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e2dfff;
+  color: #ffffff;
   margin-bottom: 1rem;
 }
 

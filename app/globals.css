@@ -84,39 +84,40 @@
   --sidebar-ring: #a6d189;
 }
 
-/* .dark — mirrors :root (app is light-first) */
+/* .dark — Catppuccin Mocha-inspired dark theme */
 .dark {
-  --background: #faf8f6;
-  --foreground: #1e1e2e;
-  --card: #f0edea;
-  --card-foreground: #1e1e2e;
-  --popover: #f5f2ef;
-  --popover-foreground: #1e1e2e;
-  --primary: #a6d189;
-  --primary-foreground: #232634;
-  --secondary: #e8e5e1;
-  --secondary-foreground: #1e1e2e;
-  --muted: #f0edea;
-  --muted-foreground: #5c5f77;
-  --accent: #f0edea;
-  --accent-foreground: #1e1e2e;
-  --destructive: #d20f39;
-  --border: rgba(108, 112, 134, 0.15);
-  --input: rgba(108, 112, 134, 0.18);
-  --ring: #a6d189;
-  --chart-1: #a6d189;
-  --chart-2: #81c8be;
-  --chart-3: #7287fd;
-  --chart-4: #df8e1d;
-  --chart-5: #8839ef;
-  --sidebar: #f0edea;
-  --sidebar-foreground: #1e1e2e;
-  --sidebar-primary: #a6d189;
-  --sidebar-primary-foreground: #232634;
-  --sidebar-accent: #e8e5e1;
-  --sidebar-accent-foreground: #1e1e2e;
-  --sidebar-border: rgba(108, 112, 134, 0.12);
-  --sidebar-ring: #a6d189;
+  --background: #1e1e2e;
+  --foreground: #cdd6f4;
+  --card: #24243a;
+  --card-foreground: #cdd6f4;
+  --popover: #24243a;
+  --popover-foreground: #cdd6f4;
+  --primary: #a6e3a1;
+  --primary-foreground: #1e1e2e;
+  --secondary: #313244;
+  --secondary-foreground: #cdd6f4;
+  --muted: #313244;
+  --muted-foreground: #a6adc8;
+  --accent: #313244;
+  --accent-foreground: #cdd6f4;
+  --destructive: #f38ba8;
+  --border: rgba(108, 112, 134, 0.25);
+  --input: rgba(108, 112, 134, 0.3);
+  --ring: #a6e3a1;
+  --chart-1: #a6e3a1;
+  --chart-2: #94e2d5;
+  --chart-3: #89b4fa;
+  --chart-4: #f9e2af;
+  --chart-5: #cba6f7;
+  --radius: 0.625rem;
+  --sidebar: #181825;
+  --sidebar-foreground: #cdd6f4;
+  --sidebar-primary: #a6e3a1;
+  --sidebar-primary-foreground: #1e1e2e;
+  --sidebar-accent: #313244;
+  --sidebar-accent-foreground: #cdd6f4;
+  --sidebar-border: rgba(108, 112, 134, 0.2);
+  --sidebar-ring: #a6e3a1;
 }
 
 @layer base {

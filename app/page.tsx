@@ -9,6 +9,7 @@ import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
+import { useTheme } from "./_hooks/use-theme";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
 import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
@@ -19,12 +20,12 @@ type RightTab = "info" | "strategy";
 
 const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
   "action-plan",
-  "doc-chips",
   "phone-script",
 ]);
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
+  const { isDark, toggle: toggleDark } = useTheme();
   const showWelcome = !engine.hasStarted;
   const inputBusy = engine.isTyping || engine.isUploading || engine.loadingStepNumber !== null;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -266,7 +267,15 @@ export default function AetherDashboard() {
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
-                  <StrategyChecklistPlaceholder stage={engine.stage} isLoading={engine.isTyping || engine.isUploading} />
+                  <StrategyChecklistPlaceholder
+                    isLoading={engine.isTyping || engine.isUploading}
+                    facts={engine.facts}
+                    hasNegotiationPlan={Boolean(engine.backendUi?.negotiationPlan)}
+                    hasPhoneScript={Boolean(
+                      engine.backendUi?.negotiationPlan?.phoneScript &&
+                        engine.backendUi.negotiationPlan.phoneScript.length > 0,
+                    )}
+                  />
                   {strategyModules.map((m, idx) => (
                     <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
                   ))}
@@ -281,6 +290,8 @@ export default function AetherDashboard() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         profile={engine.profile}
+        isDark={isDark}
+        onToggleDark={toggleDark}
       />
     </div>
   );
