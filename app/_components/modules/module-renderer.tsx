@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════ */
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleCheck, CircleDashed, CircleX, LoaderCircle } from "lucide-react";
 import type { ModuleType } from "@/app/_types/dashboard";
 import type { ChatEngine } from "@/app/_hooks/use-chat-engine";
 import { UploadZone } from "./upload-zone";
@@ -230,11 +230,77 @@ interface ModuleRendererProps {
   readonly bare?: boolean;
 }
 
+type ModuleStatus = "completed" | "queued" | "pending" | "blocked";
+
+function getModuleStatus(moduleType: ModuleType, engine: ChatEngine): ModuleStatus {
+  const unresolved = engine.isTyping || engine.isUploading ? "pending" : "queued";
+  switch (moduleType) {
+    case "upload":
+      return engine.uploaded || Boolean(engine.facts.uploadedBillId) ? "completed" : unresolved;
+    case "bill-summary":
+      return engine.analysisReady ? "completed" : unresolved;
+    case "line-items":
+      return engine.analysisReady ? "completed" : unresolved;
+    case "income-selector":
+      return engine.incomeConfirmed ? "completed" : unresolved;
+    case "eligibility":
+      if (engine.facts.assistanceEligible === "likely") return "completed";
+      if (engine.facts.assistanceEligible === "unlikely") return "blocked";
+      return unresolved;
+    case "action-plan":
+      return engine.backendUi?.negotiationPlan ? "completed" : unresolved;
+    case "doc-chips":
+      return engine.backendUi?.negotiationPlan ? "completed" : unresolved;
+    case "phone-script":
+      return (engine.backendUi?.negotiationPlan?.phoneScript?.length ?? 0) > 0 ? "completed" : unresolved;
+    case "resolution":
+      return engine.facts.negotiationOutcome ? "completed" : unresolved;
+    case "bill-receipt":
+      return engine.uploaded ? "completed" : unresolved;
+    default:
+      return unresolved;
+  }
+}
+
+function ModuleStatusBadge({ status }: { readonly status: ModuleStatus }) {
+  if (status === "completed") {
+    return (
+      <span className="module-status-badge module-status-badge--completed">
+        <CircleCheck size={12} />
+        Done
+      </span>
+    );
+  }
+  if (status === "queued") {
+    return (
+      <span className="module-status-badge module-status-badge--queued">
+        <CircleDashed size={12} />
+        Queued
+      </span>
+    );
+  }
+  if (status === "blocked") {
+    return (
+      <span className="module-status-badge module-status-badge--blocked">
+        <CircleX size={12} />
+        X
+      </span>
+    );
+  }
+  return (
+    <span className="module-status-badge module-status-badge--pending">
+      <LoaderCircle size={12} className="status-spin" />
+      Pending
+    </span>
+  );
+}
+
 export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRendererProps) {
   const delay = idx * 80;
   const loadDelay = LOAD_DELAYS[moduleType] ?? 0;
   const [loading, setLoading] = useState(loadDelay > 0);
   const isMinimized = engine.minimizedModules.has(moduleType);
+  const moduleStatus = getModuleStatus(moduleType, engine);
 
   let inferredEligible: boolean | null = null;
   if (engine.facts.assistanceEligible === "likely") {
@@ -265,15 +331,28 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
   }
 
   /* ─── Minimize header (shown on all modules unless bare) ─── */
-  const MinHeader = bare ? null : (
+  const HeaderContent = (
+    <>
+      <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      <span className="module-card__min-right">
+        <ModuleStatusBadge status={moduleStatus} />
+        {!bare && (isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
+      </span>
+    </>
+  );
+
+  const MinHeader = bare ? (
+    <div className="module-card__min-header module-card__min-header--static">
+      {HeaderContent}
+    </div>
+  ) : (
     <button
       type="button"
       className="module-card__min-header"
       onClick={() => engine.toggleMinimize(moduleType)}
       aria-expanded={!isMinimized}
     >
-      <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
-      {isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+      {HeaderContent}
     </button>
   );
 

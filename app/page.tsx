@@ -10,6 +10,7 @@ import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
+import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
 
@@ -39,6 +40,12 @@ export default function AetherDashboard() {
       setRightTab("info");
     }
   }, [hasStrategy, rightTab]);
+
+  useEffect(() => {
+    if (engine.uploaded || engine.facts.uploadedBillId) {
+      setPanelOpen(true);
+    }
+  }, [engine.uploaded, engine.facts.uploadedBillId]);
 
   return (
     <div className="aether-dashboard">
@@ -160,15 +167,13 @@ export default function AetherDashboard() {
               >
                 Session Info
               </button>
-              {hasStrategy && (
-                <button
-                  type="button"
-                  className={`right-panel__tab ${rightTab === "strategy" ? "right-panel__tab--active" : ""}`}
-                  onClick={() => setRightTab("strategy")}
-                >
-                  Strategy
-                </button>
-              )}
+              <button
+                type="button"
+                className={`right-panel__tab ${rightTab === "strategy" ? "right-panel__tab--active" : ""}`}
+                onClick={() => setRightTab("strategy")}
+              >
+                Strategy
+              </button>
             </div>
 
             {/* Tab content */}
@@ -192,8 +197,9 @@ export default function AetherDashboard() {
                 />
               )}
 
-              {rightTab === "strategy" && hasStrategy && (
+              {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
+                  <StrategyChecklistPlaceholder stage={engine.stage} isLoading={engine.isTyping || engine.isUploading} />
                   {engine.rightPanelModules.map((m, idx) => (
                     <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
                   ))}

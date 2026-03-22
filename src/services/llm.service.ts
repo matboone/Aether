@@ -3,6 +3,8 @@ import { generateText } from "ai";
 import { logError, logInfo, summarizeSessionFacts, summarizeText } from "@/src/lib/logger";
 import type { RenderableSessionUi, SessionFacts, SessionStep } from "@/src/types/domain";
 
+const FAST_GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash-lite";
+
 const fallbackMessages: Record<SessionStep, string> = {
   NEW: "Tell me the hospital name and whether you have insurance, and I will guide the next step.",
   INTAKE: "I need the hospital name and whether you have insurance before I can move you to the bill review step.",
@@ -44,7 +46,7 @@ export const llmService = {
         toolHighlightCount: input.toolHighlights.length,
       });
       const { text } = await generateText({
-        model: google("gemini-2.5-flash"),
+        model: google(FAST_GEMINI_MODEL),
         prompt: JSON.stringify({
           approvedDraft: input.approvedDraft,
           responseJob:

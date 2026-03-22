@@ -269,6 +269,7 @@ export function useChatEngine(): ChatEngine {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const factsRef = useRef<SessionFacts>(facts);
   const sessionIdRef = useRef<string | null>(sessionId);
+  const manuallyExpandedModulesRef = useRef<Set<ModuleType>>(new Set());
 
   useEffect(() => {
     factsRef.current = facts;
@@ -296,12 +297,29 @@ export function useChatEngine(): ChatEngine {
       ui: RenderableSessionUi,
       sid: string,
     ) => {
+      const visibleModules = nextModules(nextStep, ui, domainFacts);
+      const latestModule = visibleModules.at(-1) ?? null;
+
       setSessionId(sid);
       setStage(mapSessionStepToStage(nextStep));
       setBackendUi(ui);
       setAnalysisReady(Boolean(ui.analysisSummary));
       setUploaded(Boolean(domainFacts.uploadedBillId));
       setRightPanelMods(rightPanelModulesFromUi(nextStep, ui, domainFacts));
+      manuallyExpandedModulesRef.current = new Set(
+        Array.from(manuallyExpandedModulesRef.current).filter((moduleType) =>
+          visibleModules.includes(moduleType),
+        ),
+      );
+      setMinimizedModules(() => {
+        const next = new Set<ModuleType>();
+        for (const moduleType of visibleModules) {
+          if (moduleType === latestModule) continue;
+          if (manuallyExpandedModulesRef.current.has(moduleType)) continue;
+          next.add(moduleType);
+        }
+        return next;
+      });
 
       const mapped = mapDomainFactsToDashboardFacts(domainFacts, ui);
       const previous = factsRef.current;
@@ -571,6 +589,7 @@ export function useChatEngine(): ChatEngine {
     setUploadSizeLabel(null);
     setRightPanelMods([]);
     setMinimizedModules(new Set());
+    manuallyExpandedModulesRef.current = new Set();
 
     const run = async () => {
       try {
@@ -619,8 +638,10 @@ export function useChatEngine(): ChatEngine {
       const next = new Set(prev);
       if (next.has(m)) {
         next.delete(m);
+        manuallyExpandedModulesRef.current.add(m);
       } else {
         next.add(m);
+        manuallyExpandedModulesRef.current.delete(m);
       }
       return next;
     });

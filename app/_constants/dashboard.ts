@@ -32,17 +32,26 @@ export const STAGE_LABELS: Record<Stage, string> = {
 /* ─── Suggestion Chips per Stage ─── */
 
 export const SUGGESTION_CHIPS: Partial<Record<Stage, string[]>> = {
-  INTRO: ["I have an unpaid hospital bill", "I need help managing a medical bill"],
+  INTRO: [
+    "I have an unpaid hospital bill",
+    "I need help managing a medical bill",
+    "Can you walk me through this step by step?",
+  ],
   HOSPITAL_ID: [
     "TriStar Medical Center",
     "Vanderbilt / HCA",
     "Not sure of the name",
   ],
   INSURANCE_CHECK: ["No insurance", "I'm underinsured", "I have insurance"],
-  ITEMIZED_EXPLAIN: ["I don't have one", "What is an itemized bill?"],
+  ITEMIZED_EXPLAIN: [
+    "I don't have one",
+    "What is an itemized bill?",
+    "How do I request it from billing?",
+  ],
   ANALYSIS_COMPLETE: [
     "Tell me about the flagged charges",
     "What should I do first?",
+    "Show me the biggest possible savings",
   ],
 };
 
