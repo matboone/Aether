@@ -207,10 +207,7 @@
   align-items: center;
   justify-content: center;
   transform-style: preserve-3d;
-<<<<<<< HEAD
-=======
-  /* Local Y (vertical in the asset) ~50° down and toward the lower-right; +Z = clockwise = tilt to the right */
->>>>>>> origin/experimental
+  /* Local Y ~50° down toward the lower-right; +Z = tilt to the right */
   transform: rotateX(50deg) rotateZ(50deg);
 }
 
