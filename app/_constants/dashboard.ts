@@ -32,7 +32,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
 /* ─── Suggestion Chips per Stage ─── */
 
 export const SUGGESTION_CHIPS: Partial<Record<Stage, string[]>> = {
-  INTRO: ["I have an unpaid hospital bill", "I got a bill I can't afford"],
+  INTRO: ["I have an unpaid hospital bill", "I need help managing a medical bill"],
   HOSPITAL_ID: [
     "TriStar Medical Center",
     "Vanderbilt / HCA",
