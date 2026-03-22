@@ -138,6 +138,21 @@ export function SettingsDialog({ open, onClose, profile, isDark, onToggleDark }:
                 <div className="settings-about__version">v1.0.0 beta</div>
               </div>
             </div>
+            <p className="settings-attribution">
+              Caduceus icon by{" "}
+              <a href="https://www.freepik.com" target="_blank" rel="noopener noreferrer">
+                Freepik
+              </a>{" "}
+              on{" "}
+              <a
+                href="https://www.flaticon.com/free-icons/caduceus"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Flaticon
+              </a>
+              .
+            </p>
           </div>
         </div>
       </div>

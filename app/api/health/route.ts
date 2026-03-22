@@ -30,7 +30,7 @@ async function checkAi(): Promise<{ status: "ok" | "error"; detail?: string }> {
       model: google(model),
       maxRetries: 1,
       prompt: "Reply with exactly: OK",
-      maxTokens: 5,
+      maxOutputTokens: 5,
     });
     if (text.trim().length > 0) {
       result = { status: "ok" };

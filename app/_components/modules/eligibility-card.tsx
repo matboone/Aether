@@ -1,7 +1,22 @@
 "use client";
 
 import { ShieldCheck } from "lucide-react";
-import type { AssistanceAssessment } from "@/src/types/domain";
+import type { AssistanceAssessment, AssistanceOutcome } from "@/src/types/domain";
+
+function formatEstimatedSavings(outcome: AssistanceOutcome | undefined): string {
+  switch (outcome) {
+    case "full_waiver":
+      return "Full waiver";
+    case "partial_discount":
+      return "Partial discount";
+    case "payment_plan":
+      return "Payment plan";
+    case "unclear":
+      return "Outcome unclear";
+    default:
+      return "Pending assessment";
+  }
+}
 
 interface EligibilityCardProps {
   readonly eligible: boolean | null;
@@ -28,10 +43,11 @@ export function EligibilityCard({ eligible, assessment, hospitalName }: Eligibil
           `Eligibility is based on ${hospitalName ?? "hospital"} policy and your income profile.`}
       </div>
       <div className="savings-strip">
-        <span className="savings-strip__label">Estimated savings:</span>
-        <span className="savings-strip__value">
-          {assessment?.likelyOutcome?.replaceAll("_", " ") ?? "Pending assessment"}
+        <span className="savings-strip__label">Estimated savings</span>
+        <span className="savings-strip__sep" aria-hidden>
+          ·
         </span>
+        <span className="savings-strip__value">{formatEstimatedSavings(assessment?.likelyOutcome)}</span>
       </div>
     </div>
   );

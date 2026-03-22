@@ -2,7 +2,7 @@
 
 import { Settings } from "lucide-react";
 import { SIDEBAR_ICONS } from "@/app/_constants/dashboard";
-import { CaduceusIcon } from "./caduceus-icon";
+import { CaduceusMark } from "./caduceus-mark";
 
 interface SidebarProps {
   readonly activeNav: number;
@@ -16,7 +16,7 @@ export function Sidebar({ activeNav, onNavChange, onOpenSettings, profileName, p
   return (
     <aside className="aether-sidebar">
       <div className="aether-sidebar__monogram">
-        <CaduceusIcon size={22} />
+        <CaduceusMark size={38} />
       </div>
       <nav className="aether-sidebar__nav">
         {SIDEBAR_ICONS.map(({ icon: Icon, label }, i) => (
