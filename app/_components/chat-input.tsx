@@ -8,6 +8,7 @@ interface ChatInputProps {
   readonly stage: Stage;
   readonly suggestions: string[];
   readonly inputValue: string;
+  readonly isBusy: boolean;
   readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   readonly onChipClick: (text: string) => void;
   readonly onAttachFile: (file: File) => void;
@@ -20,6 +21,7 @@ export function ChatInput({
   stage,
   suggestions,
   inputValue,
+  isBusy,
   textareaRef,
   onChipClick,
   onAttachFile,
@@ -39,6 +41,7 @@ export function ChatInput({
               key={`${stage}-${i}`}
               className="suggestion-chip"
               style={{ animationDelay: `${i * 80}ms` }}
+              disabled={isBusy}
               onClick={() => onChipClick(chip)}
             >
               {chip}
@@ -63,6 +66,7 @@ export function ChatInput({
         <button
           className="input-icon-btn"
           title="Attach bill file"
+          disabled={isBusy}
           onClick={() => fileInputRef.current?.click()}
         >
           <Paperclip size={16} />
@@ -77,7 +81,8 @@ export function ChatInput({
           onKeyDown={onKeyDown}
         />
         <button
-          className={`input-icon-btn send-btn ${inputValue.trim() ? "" : "send-btn--disabled"}`}
+          className={`input-icon-btn send-btn ${inputValue.trim() && !isBusy ? "" : "send-btn--disabled"}`}
+          disabled={isBusy || !inputValue.trim()}
           onClick={() => onSend()}
           title="Send"
         >

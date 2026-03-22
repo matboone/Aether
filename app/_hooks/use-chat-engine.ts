@@ -261,6 +261,10 @@ function uniqueFirstThree(chips: string[]): string[] {
   return out;
 }
 
+function isQuestion(text: string): boolean {
+  return text.trim().endsWith("?");
+}
+
 function deriveSuggestionChips(input: {
   stage: Stage;
   messages: Message[];
@@ -276,37 +280,37 @@ function deriveSuggestionChips(input: {
   switch (input.stage) {
     case "INTRO":
       chips.push(
-        "I have an unpaid hospital bill",
-        "I need help managing a medical bill",
         "Can you walk me through this step by step?",
+        "What information do you need first to help me?",
+        "Can you explain how this process works?",
       );
       break;
     case "HOSPITAL_ID":
       chips.push(
-        "The bill is from Cigna Healthcare",
-        "I’m not sure which hospital billed me",
         "Where can I find the provider name on my statement?",
+        "How can I confirm which hospital actually billed me?",
+        "What should I do if I’m not sure which provider sent this bill?",
       );
       break;
     case "INSURANCE_CHECK":
       chips.push(
-        "I have insurance",
-        "I’m uninsured",
-        "I’m underinsured",
+        "How does having insurance change the strategy?",
+        "What if I’m uninsured?",
+        "What if I’m underinsured?",
       );
       break;
     case "ITEMIZED_EXPLAIN":
       chips.push(
         "What is an itemized bill?",
         "How do I request it from billing?",
-        "I don’t have one yet",
+        "What do I do if I don’t have one yet?",
       );
       break;
     case "BILL_UPLOAD":
       chips.push(
-        "I can upload the PDF now",
         "What counts as an itemized bill PDF?",
-        "I don’t have the PDF yet",
+        "Can I upload a photo instead of a PDF?",
+        "What should I do if I don’t have the file yet?",
       );
       break;
     case "BILL_PROCESSING":
@@ -318,16 +322,16 @@ function deriveSuggestionChips(input: {
       break;
     case "ANALYSIS_COMPLETE":
       chips.push(
-        "Tell me about the flagged charges",
-        "Show estimated savings",
+        "Can you explain the flagged charges?",
+        "What are my estimated savings?",
         "What should I do first?",
       );
       break;
     case "INCOME_CHECK":
       chips.push(
-        "Under $25k",
-        "$25k–$40k",
-        "$40k–$60k",
+        "Why do you need my income bracket?",
+        "How will income affect my eligibility result?",
+        "What if I’m not comfortable sharing my exact income?",
       );
       break;
     case "ELIGIBILITY_RESULT":
@@ -339,39 +343,27 @@ function deriveSuggestionChips(input: {
       break;
     case "ACTION_PLAN":
       chips.push(
-        "Give me the exact first ask",
-        "Show my strategy checklist",
-        "Draft my dispute summary",
+        "What should my exact first ask be?",
+        "Can you summarize my strategy checklist?",
+        "Can you draft a short dispute summary I can use?",
       );
       break;
     case "SCRIPT_GENERATED":
       chips.push(
-        "Give me the exact call script",
+        "Can you give me the exact call script?",
         "How should I respond if they push back?",
         "What phone number should I call?",
       );
       break;
     case "RESOLVED":
       chips.push(
-        "Summarize total savings",
-        "Help me ask for a payment plan",
-        "Start a new case",
+        "Can you summarize my total savings?",
+        "How should I ask for a payment plan?",
+        "Can we start a new case?",
       );
       break;
     default:
       break;
-  }
-
-  if (input.stage === "INTRO" && !input.facts.hospitalName) {
-    chips.push("The bill is from Cigna Healthcare");
-  }
-
-  if (
-    (input.stage === "INTRO" || input.stage === "BILL_UPLOAD") &&
-    !input.uploaded &&
-    !input.facts.uploadedBillId
-  ) {
-    chips.push("I’m ready to upload my PDF");
   }
 
   if ((input.stage === "BILL_PROCESSING" || input.stage === "ANALYSIS_COMPLETE") && !input.analysisReady) {
@@ -379,7 +371,7 @@ function deriveSuggestionChips(input: {
   }
 
   if (lastAi.includes("itemized") || lastAi.includes("upload")) {
-    chips.push("I’m ready to upload my PDF");
+    chips.push("What file should I upload next?");
   }
   if (lastAi.includes("income")) {
     chips.push("Why do you need my income bracket?");
@@ -388,13 +380,9 @@ function deriveSuggestionChips(input: {
     chips.push("What should I say to request a payment plan?");
   }
 
-  chips.push(...(SUGGESTION_CHIPS[input.stage] ?? []));
+  chips.push(...(SUGGESTION_CHIPS[input.stage] ?? []).filter((chip) => isQuestion(chip)));
 
-  if (input.isTyping || input.isUploading) {
-    chips.unshift("Working on that now…");
-  }
-
-  return uniqueFirstThree(chips);
+  return uniqueFirstThree(chips.filter((chip) => isQuestion(chip)));
 }
 
 export function useChatEngine(): ChatEngine {
@@ -660,6 +648,7 @@ export function useChatEngine(): ChatEngine {
 
   const handleSend = useCallback(
     (text?: string) => {
+      if (isTyping || isUploading || loadingStepNumber !== null) return;
       const msg = text ?? inputValue.trim();
       if (!msg) return;
       setInputValue("");
@@ -684,7 +673,7 @@ export function useChatEngine(): ChatEngine {
 
       void run();
     },
-    [addMessage, hasStarted, inputValue, sendChat],
+    [addMessage, hasStarted, inputValue, isTyping, isUploading, loadingStepNumber, sendChat],
   );
 
   const handleUpload = useCallback(
@@ -842,10 +831,11 @@ export function useChatEngine(): ChatEngine {
 
   const handleChipClick = useCallback(
     (text: string) => {
+      if (isTyping || isUploading || loadingStepNumber !== null) return;
       setInputValue(text);
       setTimeout(() => handleSend(text), 200);
     },
-    [handleSend],
+    [handleSend, isTyping, isUploading, loadingStepNumber],
   );
 
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {

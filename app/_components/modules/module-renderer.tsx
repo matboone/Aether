@@ -5,7 +5,7 @@
    with skeleton loading placeholders
    ═══════════════════════════════════════════════════════ */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, CircleCheck, CircleDashed, CircleX, LoaderCircle } from "lucide-react";
 import type { ModuleType } from "@/app/_types/dashboard";
 import type { ChatEngine } from "@/app/_hooks/use-chat-engine";
@@ -305,9 +305,11 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
   const delay = idx * 80;
   const loadDelay = LOAD_DELAYS[moduleType] ?? 0;
   const [loading, setLoading] = useState(loadDelay > 0);
+  const [completionFlash, setCompletionFlash] = useState(false);
   const forceExpanded = NON_MINIMIZABLE_MODULES.has(moduleType);
   const isMinimized = !forceExpanded && engine.minimizedModules.has(moduleType);
   const moduleStatus = getModuleStatus(moduleType, engine);
+  const prevStatusRef = useRef<ModuleStatus | null>(null);
 
   let inferredEligible: boolean | null = null;
   if (engine.facts.assistanceEligible === "likely") {
@@ -322,6 +324,25 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
     return () => clearTimeout(timer);
   }, [loadDelay]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (loadDelay <= 0) return;
+    setCompletionFlash(true);
+    const timer = window.setTimeout(() => setCompletionFlash(false), 1000);
+    return () => window.clearTimeout(timer);
+  }, [loadDelay, loading]);
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    if (prev !== null && prev !== moduleStatus && (moduleStatus === "completed" || moduleStatus === "blocked")) {
+      setCompletionFlash(true);
+      const timer = window.setTimeout(() => setCompletionFlash(false), 1000);
+      prevStatusRef.current = moduleStatus;
+      return () => window.clearTimeout(timer);
+    }
+    prevStatusRef.current = moduleStatus;
+  }, [moduleStatus]);
+
   const cardStyle = (extra: React.CSSProperties = {}) => ({
     animationDelay: `${delay}ms`,
     ...extra,
@@ -331,7 +352,7 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
   if (loading) {
     const Skeleton = SKELETON_MAP[moduleType];
     return (
-      <div className="module-card" style={cardStyle()}>
+      <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
         <Skeleton />
       </div>
     );
@@ -365,14 +386,14 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
 
   if (isMinimized && !bare) {
     return (
-      <div className="module-card module-card--minimized" style={cardStyle()}>
+      <div className={`module-card module-card--minimized ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
         {MinHeader}
       </div>
     );
   }
 
   const wrapCard = (children: React.ReactNode, extra: React.CSSProperties = {}) => (
-    <div className="module-card" style={cardStyle(extra)}>
+    <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle(extra)}>
       {MinHeader}
       {children}
     </div>

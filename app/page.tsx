@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
 import { STAGE_LABELS } from "./_constants/dashboard";
@@ -26,20 +26,24 @@ const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
 export default function AetherDashboard() {
   const engine = useChatEngine();
   const showWelcome = !engine.hasStarted;
+  const inputBusy = engine.isTyping || engine.isUploading || engine.loadingStepNumber !== null;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rightTab, setRightTab] = useState<RightTab>("info");
   const [panelOpen, setPanelOpen] = useState(false);
+  const [panelPrimed, setPanelPrimed] = useState(false);
+  const autoOpenTriggeredRef = useRef(false);
 
-  /* Show the right panel once we have any data */
-  const hasFacts =
-    engine.facts.hospitalName !== null ||
-    engine.facts.hasInsurance !== null ||
-    engine.facts.estimatedBillTotal !== null ||
-    engine.facts.incomeBracket !== null ||
-    engine.facts.negotiationOutcome !== null;
+  const eligibilityCompleted =
+    engine.facts.assistanceEligible === "likely" ||
+    engine.facts.assistanceEligible === "unlikely";
 
-  const hasStrategy = engine.rightPanelModules.length > 0;
-  const showRightPanel = hasFacts || hasStrategy;
+  const strategyModules = useMemo(
+    () =>
+      engine.rightPanelModules.filter((m) =>
+        eligibilityCompleted ? true : m !== "action-plan" && m !== "phone-script",
+      ),
+    [eligibilityCompleted, engine.rightPanelModules],
+  );
 
   const revealedInlineModules = useMemo<ModuleType[]>(() => {
     if (!engine.moduleRevealMessageId) return [];
@@ -69,18 +73,37 @@ export default function AetherDashboard() {
     };
   }, [engine.facts, revealedInlineModules]);
 
-  /* Auto-switch to strategy tab when strategy content appears */
   useEffect(() => {
-    if (!hasStrategy && rightTab === "strategy") {
-      setRightTab("info");
+    if (!engine.hasStarted) {
+      autoOpenTriggeredRef.current = false;
+      setPanelPrimed(false);
+      setPanelOpen(false);
+      return;
     }
-  }, [hasStrategy, rightTab]);
+    if (autoOpenTriggeredRef.current) return;
+    autoOpenTriggeredRef.current = true;
+    let primedTimer: number | null = null;
+    const autoOpenTimer = window.setTimeout(() => {
+      setPanelOpen(true);
+      primedTimer = window.setTimeout(() => {
+        setPanelPrimed(true);
+      }, 360);
+    }, 1000);
+    return () => {
+      window.clearTimeout(autoOpenTimer);
+      if (primedTimer !== null) {
+        window.clearTimeout(primedTimer);
+      }
+    };
+  }, [engine.hasStarted]);
 
   useEffect(() => {
     if (engine.uploaded || engine.facts.uploadedBillId) {
-      setPanelOpen(true);
+      if (panelPrimed) {
+        setPanelOpen(true);
+      }
     }
-  }, [engine.uploaded, engine.facts.uploadedBillId]);
+  }, [engine.uploaded, engine.facts.uploadedBillId, panelPrimed]);
 
   return (
     <div className="aether-dashboard">
@@ -112,6 +135,7 @@ export default function AetherDashboard() {
                 stage={engine.stage}
                 suggestions={engine.suggestionChips}
                 inputValue={engine.inputValue}
+                isBusy={inputBusy}
                 textareaRef={engine.textareaRef}
                 onChipClick={engine.handleChipClick}
                 onAttachFile={engine.handleUpload}
@@ -161,15 +185,14 @@ export default function AetherDashboard() {
                   : STAGE_LABELS[engine.stage]}
               </span>
 
-              {showRightPanel && (
-                <button
-                  className="aether-chat__panel-toggle"
-                  onClick={() => setPanelOpen((p) => !p)}
-                  aria-label={panelOpen ? "Hide side panel" : "Show side panel"}
-                >
-                  {panelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
-                </button>
-              )}
+              <button
+                className="aether-chat__panel-toggle"
+                onClick={() => setPanelOpen((p) => !p)}
+                aria-label={panelOpen ? "Hide side panel" : "Show side panel"}
+                disabled={!panelPrimed}
+              >
+                {panelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+              </button>
             </div>
 
             <ChatThread
@@ -183,6 +206,7 @@ export default function AetherDashboard() {
               stage={engine.stage}
               suggestions={engine.suggestionChips}
               inputValue={engine.inputValue}
+              isBusy={inputBusy}
               textareaRef={engine.textareaRef}
               onChipClick={engine.handleChipClick}
               onAttachFile={engine.handleUpload}
@@ -195,7 +219,7 @@ export default function AetherDashboard() {
       </main>
 
       {/* ─── Right Panel (fixed overlay, slide in/out) ─── */}
-      {showRightPanel && (
+      {!showWelcome && (
         <aside
           className={`right-panel${panelOpen ? "" : " right-panel--hidden"}`}
         >
@@ -220,28 +244,30 @@ export default function AetherDashboard() {
             {/* Tab content */}
             <div className="right-panel__content">
               {rightTab === "info" && (
-                <SessionFactsPanel
-                  facts={factsForPanel}
-                  flashFields={engine.flashFields}
-                  summaryExpanded={engine.summaryExpanded}
-                  openSections={engine.openSections}
-                  techIdsOpen={engine.techIdsOpen}
-                  onToggleSection={(key) =>
-                    engine.setOpenSections((prev) => ({
-                      ...prev,
-                      [key]: !prev[key],
-                    }))
-                  }
-                  onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
-                  onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
-                  onClearSession={engine.clearSession}
-                />
+                <div className="right-panel__info-wrap">
+                  <SessionFactsPanel
+                    facts={factsForPanel}
+                    flashFields={engine.flashFields}
+                    summaryExpanded={engine.summaryExpanded}
+                    openSections={engine.openSections}
+                    techIdsOpen={engine.techIdsOpen}
+                    onToggleSection={(key) =>
+                      engine.setOpenSections((prev) => ({
+                        ...prev,
+                        [key]: !prev[key],
+                      }))
+                    }
+                    onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
+                    onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
+                    onClearSession={engine.clearSession}
+                  />
+                </div>
               )}
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
                   <StrategyChecklistPlaceholder stage={engine.stage} isLoading={engine.isTyping || engine.isUploading} />
-                  {engine.rightPanelModules.map((m, idx) => (
+                  {strategyModules.map((m, idx) => (
                     <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
                   ))}
                 </div>

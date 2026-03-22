@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Message, ModuleType } from "@/app/_types/dashboard";
 import type { ChatEngine } from "@/app/_hooks/use-chat-engine";
 import { ModuleRenderer } from "./modules/module-renderer";
@@ -18,6 +18,10 @@ const STICKY_INLINE_MODULES: Set<ModuleType> = new Set([
   "line-items",
 ]);
 
+const ELIGIBILITY_LOAD_MS = 2900;
+const BRACKET_BUBBLE_EXTRA_DELAY_MS = 600;
+const INCOME_MODULE_DELAY_MS = 700;
+
 interface ChatThreadProps {
   readonly messages: Message[];
   readonly isTyping: boolean;
@@ -26,6 +30,24 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThreadProps) {
+  const [bracketBubbleReadyIds, setBracketBubbleReadyIds] = useState<Set<string>>(new Set());
+  const [incomeModuleReadyIds, setIncomeModuleReadyIds] = useState<Set<string>>(new Set());
+  const bracketTimersRef = useRef<Map<string, number>>(new Map());
+  const incomeTimersRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      for (const timerId of bracketTimersRef.current.values()) {
+        window.clearTimeout(timerId);
+      }
+      for (const timerId of incomeTimersRef.current.values()) {
+        window.clearTimeout(timerId);
+      }
+      bracketTimersRef.current.clear();
+      incomeTimersRef.current.clear();
+    };
+  }, []);
+
   /*
    * Deduplicate modules: for each ModuleType, only the LAST message
    * that declares it actually renders it. This prevents duplicate
@@ -51,6 +73,53 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
     return result;
   }, [messages]);
 
+  useEffect(() => {
+    for (const msg of messages) {
+      const allModulesForMsg = allowedModulesPerMsg.get(msg.id) ?? [];
+      const createdAt = Number(msg.id.split("-")[1] ?? 0);
+      const elapsed = Number.isFinite(createdAt) && createdAt > 0 ? Date.now() - createdAt : 0;
+
+      const bracketMessageNeedsDelay =
+        msg.sender === "ai" &&
+        /based on this bracket/i.test(msg.text) &&
+        allModulesForMsg.includes("eligibility");
+      if (
+        bracketMessageNeedsDelay &&
+        !bracketBubbleReadyIds.has(msg.id) &&
+        !bracketTimersRef.current.has(msg.id)
+      ) {
+        const waitMs = Math.max(0, ELIGIBILITY_LOAD_MS + BRACKET_BUBBLE_EXTRA_DELAY_MS - elapsed);
+        if (waitMs <= 0) {
+          setBracketBubbleReadyIds((prev) => new Set(prev).add(msg.id));
+        } else {
+          const timerId = window.setTimeout(() => {
+            setBracketBubbleReadyIds((prev) => new Set(prev).add(msg.id));
+            bracketTimersRef.current.delete(msg.id);
+          }, waitMs);
+          bracketTimersRef.current.set(msg.id, timerId);
+        }
+      }
+
+      const incomeModuleNeedsDelay = allModulesForMsg.includes("income-selector");
+      if (
+        incomeModuleNeedsDelay &&
+        !incomeModuleReadyIds.has(msg.id) &&
+        !incomeTimersRef.current.has(msg.id)
+      ) {
+        const waitMs = Math.max(0, INCOME_MODULE_DELAY_MS - elapsed);
+        if (waitMs <= 0) {
+          setIncomeModuleReadyIds((prev) => new Set(prev).add(msg.id));
+        } else {
+          const timerId = window.setTimeout(() => {
+            setIncomeModuleReadyIds((prev) => new Set(prev).add(msg.id));
+            incomeTimersRef.current.delete(msg.id);
+          }, waitMs);
+          incomeTimersRef.current.set(msg.id, timerId);
+        }
+      }
+    }
+  }, [allowedModulesPerMsg, bracketBubbleReadyIds, incomeModuleReadyIds, messages]);
+
   return (
     <div className="aether-chat__thread" ref={threadRef}>
       {messages.map((msg) => {
@@ -59,37 +128,41 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
           msg.id === engine.moduleRevealMessageId
             ? allModulesForMsg.slice(0, Math.max(0, engine.moduleRevealCount))
             : allModulesForMsg;
-        const showModulesBeforeMessage =
+        const delayBracketBubble =
           msg.sender === "ai" &&
-          modulesForMsg.includes("eligibility") &&
-          /based on this bracket/i.test(msg.text);
+          /based on this bracket/i.test(msg.text) &&
+          allModulesForMsg.includes("eligibility") &&
+          !bracketBubbleReadyIds.has(msg.id);
+        const delayIncomeModule =
+          allModulesForMsg.includes("income-selector") &&
+          !incomeModuleReadyIds.has(msg.id);
+        const visibleModules = delayIncomeModule ? [] : modulesForMsg;
+        const hasText = msg.text.trim().length > 0;
         return (
           <div key={msg.id} className={`msg-wrapper msg-wrapper--${msg.sender}`}>
             {msg.sender === "ai" && <div className="msg-avatar">A</div>}
             <div>
-              {showModulesBeforeMessage &&
-                modulesForMsg.map((m, idx) => (
-                  <ModuleRenderer
-                    key={m}
-                    moduleType={m}
-                    idx={idx}
-                    engine={engine}
-                  />
-                ))}
-
-              <div className={`msg-bubble msg-bubble--${msg.sender}`}>
-                {msg.sender === "ai" && <div className="msg-sender">Aether</div>}
-                <div className="msg-text">{msg.text}</div>
-              </div>
-              {!showModulesBeforeMessage &&
-                modulesForMsg.map((m, idx) => (
-                  <ModuleRenderer
-                    key={m}
-                    moduleType={m}
-                    idx={idx}
-                    engine={engine}
-                  />
-                ))}
+              {hasText && !delayBracketBubble && (
+                <div
+                  className={`msg-bubble msg-bubble--${msg.sender}`}
+                >
+                  {msg.sender === "ai" && <div className="msg-sender">Aether</div>}
+                  <div className="msg-text">{msg.text}</div>
+                </div>
+              )}
+              {visibleModules.length > 0 && (
+                <div className="msg-modules">
+                  {visibleModules.map((m, idx) => (
+                    <div key={`${msg.id}-${m}-${idx}`} className="msg-module-slot">
+                      <ModuleRenderer
+                        moduleType={m}
+                        idx={idx}
+                        engine={engine}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );

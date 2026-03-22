@@ -65,11 +65,6 @@
   50% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes factFlash {
-  0% { background-color: var(--clr-primary-fixed); }
-  100% { background-color: transparent; }
-}
-
 @keyframes meterFill {
   from { width: 0%; }
   to { width: 75%; }
@@ -290,6 +285,17 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+.aether-chat__panel-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.aether-chat__panel-toggle:disabled:hover {
+  background: var(--clr-surface-low);
+  color: var(--clr-text-muted);
+}
+
 .aether-chat__thread {
   flex: 1;
   overflow-y: auto;
@@ -357,6 +363,10 @@
   padding: 0.75rem 1rem;
 }
 
+.msg-bubble--after-modules {
+  margin-top: 0.625rem;
+}
+
 .msg-bubble--ai {
   max-width: 75%;
   background: var(--clr-surface-low);
@@ -388,6 +398,17 @@
 
 .msg-bubble--user .msg-text {
   color: var(--clr-on-primary);
+}
+
+.msg-modules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 0.625rem;
+}
+
+.msg-module-slot {
+  width: 100%;
 }
 
 /* ─── Typing Indicator ─── */
@@ -426,11 +447,15 @@
   box-shadow: var(--shadow-card);
   margin-top: 0.625rem;
   animation: fadeSlideIn 300ms ease-out both;
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 500ms ease;
   max-width: 480px;
   width: 100%;
   overflow-x: hidden;
   word-wrap: break-word;
+}
+
+.module-card--flash-blue {
+  background-color: rgba(129, 200, 190, 0.2);
 }
 
 .module-card:hover {
@@ -1358,6 +1383,13 @@
   box-shadow: 0 2px 12px rgba(166, 209, 137, 0.12);
 }
 
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .input-container {
   background: rgba(250, 248, 246, 0.6);
   border-radius: var(--radius-card-lg);
@@ -1412,6 +1444,16 @@
 
 .input-icon-btn:hover {
   color: var(--clr-primary);
+}
+
+.input-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--clr-text-muted);
+}
+
+.input-icon-btn:disabled:hover {
+  color: var(--clr-text-muted);
 }
 
 .send-btn:hover {
@@ -1527,6 +1569,16 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
+}
+
+.right-panel__info-wrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.right-panel__surface--flash {
+  animation: none;
 }
 
 .right-panel__strategy-body .module-card {
@@ -1691,11 +1743,11 @@
   gap: 0.375rem;
   padding: 0.3rem 0;
   border-radius: 0.25rem;
-  transition: background 600ms ease;
+  transition: background-color 500ms ease;
 }
 
 .fact-kv--flash {
-  animation: factFlash 600ms ease-out;
+  background-color: rgba(129, 200, 190, 0.22);
 }
 
 .fact-kv__key {

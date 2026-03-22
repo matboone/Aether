@@ -67,6 +67,8 @@ export const llmService = {
             "Ask only the next allowed question or present only the next allowed step.",
             "Do not add extra workflow steps.",
             "Sound like a calm, capable assistant in a live conversation.",
+            "Answer follow-up questions directly before suggesting a next step.",
+            "Default to concise replies in 1-3 short sentences unless the user asks for more detail.",
             "Be concise, polished, and helpful.",
           ],
         }),
