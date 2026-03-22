@@ -38,6 +38,7 @@ export function ChatInput({
         <div className="suggestion-strip">
           {chips.map((chip, i) => (
             <button
+              type="button"
               key={`${stage}-${i}`}
               className="suggestion-chip"
               style={{ animationDelay: `${i * 80}ms` }}
@@ -64,6 +65,7 @@ export function ChatInput({
           }}
         />
         <button
+          type="button"
           className="input-icon-btn"
           title="Attach bill file"
           disabled={isBusy}
@@ -81,6 +83,7 @@ export function ChatInput({
           onKeyDown={onKeyDown}
         />
         <button
+          type="button"
           className={`input-icon-btn send-btn ${inputValue.trim() && !isBusy ? "" : "send-btn--disabled"}`}
           disabled={isBusy || !inputValue.trim()}
           onClick={() => onSend()}

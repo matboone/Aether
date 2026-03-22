@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
-import { STAGE_LABELS } from "./_constants/dashboard";
 import { Sidebar } from "./_components/sidebar";
 import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
@@ -11,21 +10,71 @@ import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { useTheme } from "./_hooks/use-theme";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
-import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ChatHistoryRail } from "./_components/chat-history-rail";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
-import type { ModuleType, SessionFacts } from "./_types/dashboard";
+import type { ModuleType } from "./_types/dashboard";
 
 type RightTab = "info" | "strategy";
 
+type DashboardPreferences = {
+  compactDensity: boolean;
+  reduceMotion: boolean;
+  autoOpenPanel: boolean;
+  fastModuleReveal: boolean;
+  rememberRightTab: boolean;
+};
+
+const DASHBOARD_PREFERENCES_KEY = "aether-dashboard-preferences";
+const DASHBOARD_LAST_TAB_KEY = "aether-dashboard-last-tab";
+
+const DEFAULT_PREFERENCES: DashboardPreferences = {
+  compactDensity: false,
+  reduceMotion: false,
+  autoOpenPanel: true,
+  fastModuleReveal: false,
+  rememberRightTab: true,
+};
+
 const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
+  "eligibility",
   "action-plan",
+  "doc-chips",
   "phone-script",
 ]);
 
+const STRATEGY_PIPELINE_ORDER: ModuleType[] = [
+  "eligibility",
+  "action-plan",
+  "phone-script",
+  "doc-chips",
+];
+
+function isStrategyModuleComplete(moduleType: ModuleType, engine: ReturnType<typeof useChatEngine>): boolean {
+  switch (moduleType) {
+    case "eligibility":
+      return (
+        engine.facts.assistanceEligible === "likely" ||
+        engine.facts.assistanceEligible === "unlikely" ||
+        Boolean(engine.backendUi?.negotiationPlan?.assistanceAssessment)
+      );
+    case "action-plan":
+      return (engine.backendUi?.negotiationPlan?.nextActions?.length ?? 0) > 0;
+    case "phone-script":
+      return (engine.backendUi?.negotiationPlan?.phoneScript?.length ?? 0) > 0;
+    case "doc-chips":
+      return (
+        (engine.backendUi?.negotiationPlan?.nextActions?.length ?? 0) > 0 &&
+        (engine.backendUi?.negotiationPlan?.phoneScript?.length ?? 0) > 0
+      );
+    default:
+      return false;
+  }
+}
+
 export default function AetherDashboard() {
-  const engine = useChatEngine();
+  const [preferences, setPreferences] = useState<DashboardPreferences>(DEFAULT_PREFERENCES);
+  const engine = useChatEngine({ fastModuleReveal: preferences.fastModuleReveal });
   const { isDark, toggle: toggleDark } = useTheme();
   const showWelcome = !engine.hasStarted;
   const inputBusy = engine.isTyping || engine.isUploading || engine.loadingStepNumber !== null;
@@ -33,71 +82,144 @@ export default function AetherDashboard() {
   const [rightTab, setRightTab] = useState<RightTab>("info");
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelPrimed, setPanelPrimed] = useState(false);
+  const [strategyRevealCount, setStrategyRevealCount] = useState(0);
   const autoOpenTriggeredRef = useRef(false);
+  const strategyTabAutoOpenedRef = useRef(false);
 
-  const revealedInlineModules = useMemo<ModuleType[]>(() => {
-    if (!engine.moduleRevealMessageId) return [];
-    const msg = engine.messages.find((m) => m.id === engine.moduleRevealMessageId);
-    if (!msg?.modules?.length) return [];
-    return msg.modules
-      .filter((m): m is ModuleType => !RIGHT_PANEL_MODULES.has(m))
-      .slice(0, Math.max(0, engine.moduleRevealCount));
-  }, [engine.messages, engine.moduleRevealCount, engine.moduleRevealMessageId]);
+  const setPreference = useCallback(<K extends keyof DashboardPreferences>(key: K, value: DashboardPreferences[K]) => {
+    setPreferences((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
-  const factsForPanel = useMemo<SessionFacts>(() => {
-    const visible = new Set<ModuleType>(revealedInlineModules);
-    const billVisible = visible.has("bill-summary") || visible.has("line-items") || visible.has("upload");
-    const eligibilityVisible = visible.has("eligibility") || visible.has("income-selector");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DASHBOARD_PREFERENCES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<DashboardPreferences>;
+        setPreferences({ ...DEFAULT_PREFERENCES, ...parsed });
+        if (parsed.rememberRightTab ?? DEFAULT_PREFERENCES.rememberRightTab) {
+          const savedTab = localStorage.getItem(DASHBOARD_LAST_TAB_KEY);
+          if (savedTab === "info" || savedTab === "strategy") {
+            setRightTab(savedTab);
+          }
+        }
+      }
+    } catch {
+      setPreferences(DEFAULT_PREFERENCES);
+    }
+  }, []);
 
-    return {
-      ...engine.facts,
-      estimatedBillTotal: billVisible ? engine.facts.estimatedBillTotal : null,
-      uploadedBillId: billVisible ? engine.facts.uploadedBillId : null,
-      parsedBillId: billVisible ? engine.facts.parsedBillId : null,
-      analysisId: billVisible ? engine.facts.analysisId : null,
-      incomeBracket: eligibilityVisible ? engine.facts.incomeBracket : null,
-      householdSize: eligibilityVisible ? engine.facts.householdSize : null,
-      assistanceEligible: eligibilityVisible ? engine.facts.assistanceEligible : null,
+  useEffect(() => {
+    try {
+      localStorage.setItem(DASHBOARD_PREFERENCES_KEY, JSON.stringify(preferences));
+    } catch {
+      // Ignore persistence failures (private mode, blocked storage, etc.)
+    }
+  }, [preferences]);
+
+  useEffect(() => {
+    if (!preferences.rememberRightTab) {
+      try {
+        localStorage.removeItem(DASHBOARD_LAST_TAB_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    try {
+      localStorage.setItem(DASHBOARD_LAST_TAB_KEY, rightTab);
+    } catch {
+      // ignore
+    }
+  }, [preferences.rememberRightTab, rightTab]);
+
+  const factsForPanel = engine.facts;
+  const availableStrategyModules = useMemo(
+    () => STRATEGY_PIPELINE_ORDER.filter((m) => engine.rightPanelModules.includes(m)),
+    [engine.rightPanelModules],
+  );
+
+  useEffect(() => {
+    if (availableStrategyModules.length === 0) {
+      setStrategyRevealCount(0);
+      return;
+    }
+    setStrategyRevealCount((prev) => Math.max(prev, 1));
+  }, [availableStrategyModules.length]);
+
+  useEffect(() => {
+    if (availableStrategyModules.length === 0 || strategyRevealCount === 0) return;
+    if (strategyRevealCount >= availableStrategyModules.length) return;
+    const currentModule = availableStrategyModules[strategyRevealCount - 1];
+    if (!isStrategyModuleComplete(currentModule, engine)) return;
+
+    const timer = globalThis.setTimeout(() => {
+      setStrategyRevealCount((prev) => {
+        if (prev >= availableStrategyModules.length) return prev;
+        return prev + 1;
+      });
+    }, 240);
+
+    return () => {
+      globalThis.clearTimeout(timer);
     };
-  }, [engine.facts, revealedInlineModules]);
+  }, [availableStrategyModules, engine, strategyRevealCount]);
+
+  const visibleStrategyModules = useMemo(
+    () => availableStrategyModules.slice(0, Math.max(0, strategyRevealCount)),
+    [availableStrategyModules, strategyRevealCount],
+  );
 
   useEffect(() => {
     if (!engine.hasStarted) {
       autoOpenTriggeredRef.current = false;
+      strategyTabAutoOpenedRef.current = false;
       setPanelPrimed(false);
       setPanelOpen(false);
+      return;
+    }
+    if (!preferences.autoOpenPanel) {
+      setPanelPrimed(true);
       return;
     }
     if (autoOpenTriggeredRef.current) return;
     autoOpenTriggeredRef.current = true;
     let primedTimer: number | null = null;
-    const autoOpenTimer = window.setTimeout(() => {
+    const autoOpenTimer = globalThis.setTimeout(() => {
       setPanelOpen(true);
-      primedTimer = window.setTimeout(() => {
+      primedTimer = globalThis.setTimeout(() => {
         setPanelPrimed(true);
       }, 360);
     }, 1000);
     return () => {
-      window.clearTimeout(autoOpenTimer);
+      globalThis.clearTimeout(autoOpenTimer);
       if (primedTimer !== null) {
-        window.clearTimeout(primedTimer);
+        globalThis.clearTimeout(primedTimer);
       }
     };
-  }, [engine.hasStarted]);
+  }, [engine.hasStarted, preferences.autoOpenPanel]);
 
   useEffect(() => {
+    if (availableStrategyModules.length === 0) return;
+    if (strategyTabAutoOpenedRef.current) return;
+    strategyTabAutoOpenedRef.current = true;
+    setPanelOpen(true);
+    setRightTab("strategy");
+  }, [availableStrategyModules.length]);
+
+  useEffect(() => {
+    if (!preferences.autoOpenPanel) return;
     if (engine.uploaded || engine.facts.uploadedBillId) {
       if (panelPrimed) {
         setPanelOpen(true);
       }
     }
-  }, [engine.uploaded, engine.facts.uploadedBillId, panelPrimed]);
+  }, [engine.uploaded, engine.facts.uploadedBillId, panelPrimed, preferences.autoOpenPanel]);
 
   return (
     <div
       className={`aether-dashboard${
         !showWelcome && panelOpen ? " aether-dashboard--panel-open" : ""
-      }`}
+      }${preferences.compactDensity ? " aether-dashboard--compact" : ""}${preferences.reduceMotion ? " aether-dashboard--reduce-motion" : ""}`}
     >
       {/* ─── Left Sidebar ─── */}
       <Sidebar
@@ -185,11 +307,6 @@ export default function AetherDashboard() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <span key={engine.stage} className="aether-chat__breadcrumb">
-                {engine.loadingStepNumber !== null
-                  ? `STEP ${engine.loadingStepNumber}: LOADING`
-                  : STAGE_LABELS[engine.stage]}
-              </span>
 
               <button
                 className="aether-chat__panel-toggle"
@@ -254,7 +371,11 @@ export default function AetherDashboard() {
                   <SessionFactsPanel
                     facts={factsForPanel}
                     flashFields={engine.flashFields}
-                    summaryExpanded={engine.summaryExpanded}
+                    stage={engine.stage}
+                    isLoading={engine.isTyping || engine.isUploading || engine.loadingStepNumber !== null}
+                    incomeConfirmed={engine.incomeConfirmed}
+                    hasStrategyPlan={Boolean(engine.backendUi?.negotiationPlan)}
+                    hasPhoneScript={Boolean((engine.backendUi?.negotiationPlan?.phoneScript?.length ?? 0) > 0)}
                     openSections={engine.openSections}
                     techIdsOpen={engine.techIdsOpen}
                     onToggleSection={(key) =>
@@ -264,7 +385,6 @@ export default function AetherDashboard() {
                       }))
                     }
                     onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
-                    onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
                     onClearSession={engine.clearSession}
                   />
                 </div>
@@ -272,20 +392,9 @@ export default function AetherDashboard() {
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
-                  <StrategyChecklistPlaceholder
-                    isLoading={engine.isTyping || engine.isUploading}
-                    facts={engine.facts}
-                    hasNegotiationPlan={Boolean(engine.backendUi?.negotiationPlan)}
-                    hasPhoneScript={Boolean(
-                      engine.backendUi?.negotiationPlan?.phoneScript &&
-                        engine.backendUi.negotiationPlan.phoneScript.length > 0,
-                    )}
-                  />
-                  {engine.rightPanelModules
-                    .filter((m) => m !== "action-plan")
-                    .map((m, idx) => (
-                      <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
-                    ))}
+                  {visibleStrategyModules.map((m, idx) => (
+                    <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
+                  ))}
                 </div>
               )}
             </div>
@@ -299,6 +408,8 @@ export default function AetherDashboard() {
         profile={engine.profile}
         isDark={isDark}
         onToggleDark={toggleDark}
+        preferences={preferences}
+        onSetPreference={setPreference}
       />
     </div>
   );
