@@ -49,7 +49,7 @@ export function ChatInput({
         <textarea
           ref={textareaRef}
           className="input-textarea"
-          placeholder="Describe your situation or ask a question\u2026"
+          placeholder="Describe your situation or ask a question…"
           rows={1}
           value={inputValue}
           onChange={onTextareaChange}

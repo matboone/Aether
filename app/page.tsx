@@ -10,7 +10,8 @@ import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
-import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { CaduceusIcon } from "./_components/caduceus-icon";
 
 type RightTab = "info" | "strategy";
 
@@ -83,14 +84,12 @@ export default function AetherDashboard() {
         {showWelcome ? (
           <>
             <div className="welcome-hero">
-              <div className="welcome-hero__monogram">A</div>
+              <div className="welcome-hero__monogram">
+                <CaduceusIcon size={40} />
+              </div>
               <h1 className="welcome-hero__title">Aether</h1>
               <p className="welcome-hero__sub">
                 Navigate medical bills with clarity.
-                <br />
-                <span className="welcome-hero__sub--muted">
-                  Upload, analyze &amp; negotiate — step by step.
-                </span>
               </p>
             </div>
 
@@ -108,21 +107,21 @@ export default function AetherDashboard() {
 
             <div className="welcome-features">
               <div className="welcome-feature-card">
-                <span className="welcome-feature-card__icon">📄</span>
+                <FileText size={20} className="welcome-feature-card__icon" />
                 <div className="welcome-feature-card__title">Bill Analysis</div>
                 <div className="welcome-feature-card__desc">
                   Upload your bill and get an instant line-by-line breakdown with fair-price benchmarks.
                 </div>
               </div>
               <div className="welcome-feature-card">
-                <span className="welcome-feature-card__icon">💡</span>
+                <Lightbulb size={20} className="welcome-feature-card__icon" />
                 <div className="welcome-feature-card__title">Savings Finder</div>
                 <div className="welcome-feature-card__desc">
                   Discover financial assistance programs and negotiation strategies you qualify for.
                 </div>
               </div>
               <div className="welcome-feature-card">
-                <span className="welcome-feature-card__icon">📞</span>
+                <Phone size={20} className="welcome-feature-card__icon" />
                 <div className="welcome-feature-card__title">Call Scripts</div>
                 <div className="welcome-feature-card__desc">
                   Get a ready-to-use phone script tailored to your exact situation and hospital.

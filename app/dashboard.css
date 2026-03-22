@@ -123,14 +123,11 @@
   width: 36px;
   height: 36px;
   border-radius: 0.625rem;
-  background: var(--clr-primary-fixed);
+  background: var(--clr-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--clr-primary);
+  color: #e2dfff;
   margin-bottom: 1.25rem;
   flex-shrink: 0;
 }
@@ -416,7 +413,7 @@
 /* ─── Inline Module Cards ─── */
 
 .module-card {
-  background: var(--clr-surface-high);
+  background: var(--clr-surface-low);
   border-radius: var(--radius-card);
   padding: 1rem;
   box-shadow: var(--shadow-card);
@@ -1409,6 +1406,10 @@
   color: var(--clr-primary);
 }
 
+.send-btn:hover {
+  color: var(--clr-on-primary);
+}
+
 .send-btn {
   background: var(--gradient-primary);
   color: var(--clr-on-primary);
@@ -1972,14 +1973,11 @@
   width: 72px;
   height: 72px;
   border-radius: 1.125rem;
-  background: var(--clr-primary-fixed);
+  background: var(--clr-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 2rem;
-  color: var(--clr-primary);
+  color: #e2dfff;
   margin-bottom: 1rem;
 }
 
@@ -2051,8 +2049,8 @@
 
 .welcome-feature-card__icon {
   display: block;
-  font-size: 1.25rem;
   margin-bottom: 0.5rem;
+  color: var(--clr-primary);
 }
 
 .welcome-feature-card__title {
