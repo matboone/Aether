@@ -81,7 +81,7 @@
   --sidebar-accent: #e8e5e1;
   --sidebar-accent-foreground: #1e1e2e;
   --sidebar-border: rgba(108, 112, 134, 0.12);
-  --sidebar-ring: #40a02b;
+  --sidebar-ring: #a6d189;
 }
 
 /* .dark — mirrors :root (app is light-first) */
@@ -92,8 +92,8 @@
   --card-foreground: #1e1e2e;
   --popover: #f5f2ef;
   --popover-foreground: #1e1e2e;
-  --primary: #40a02b;
-  --primary-foreground: #ffffff;
+  --primary: #a6d189;
+  --primary-foreground: #232634;
   --secondary: #e8e5e1;
   --secondary-foreground: #1e1e2e;
   --muted: #f0edea;
@@ -103,20 +103,20 @@
   --destructive: #d20f39;
   --border: rgba(108, 112, 134, 0.15);
   --input: rgba(108, 112, 134, 0.18);
-  --ring: #40a02b;
-  --chart-1: #40a02b;
-  --chart-2: #179299;
+  --ring: #a6d189;
+  --chart-1: #a6d189;
+  --chart-2: #81c8be;
   --chart-3: #7287fd;
   --chart-4: #df8e1d;
   --chart-5: #8839ef;
   --sidebar: #f0edea;
   --sidebar-foreground: #1e1e2e;
-  --sidebar-primary: #40a02b;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #a6d189;
+  --sidebar-primary-foreground: #232634;
   --sidebar-accent: #e8e5e1;
   --sidebar-accent-foreground: #1e1e2e;
   --sidebar-border: rgba(108, 112, 134, 0.12);
-  --sidebar-ring: #40a02b;
+  --sidebar-ring: #a6d189;
 }
 
 @layer base {
