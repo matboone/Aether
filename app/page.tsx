@@ -14,7 +14,7 @@ import { ModuleRenderer } from "./_components/modules/module-renderer";
 import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ChatHistoryRail } from "./_components/chat-history-rail";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { CaduceusIcon } from "./_components/caduceus-icon";
+import { CaduceusMark } from "./_components/caduceus-mark";
 import type { ModuleType, SessionFacts } from "./_types/dashboard";
 
 type RightTab = "info" | "strategy";
@@ -128,7 +128,7 @@ export default function AetherDashboard() {
           <>
             <div className="welcome-hero">
               <div className="welcome-hero__monogram">
-                <CaduceusIcon size={40} />
+                <CaduceusMark size={74} />
               </div>
               <h1 className="welcome-hero__title">Aether</h1>
               <p className="welcome-hero__sub">

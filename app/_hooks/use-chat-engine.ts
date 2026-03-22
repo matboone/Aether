@@ -38,6 +38,31 @@ const UI_LABEL_TO_SERVER_BRACKET: Record<string, string> = {
   "Prefer not to say": "80k_plus",
 };
 
+const SESSION_CREATE_NETWORK = "__session_network__";
+
+function bootstrapErrorMessage(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "";
+  if (msg === SESSION_CREATE_NETWORK || /failed to fetch|networkerror|load failed/i.test(msg)) {
+    return "Could not reach this app’s server. If you’re developing locally, run `npm run dev` and open the URL it prints (usually http://localhost:3000).";
+  }
+  if (msg.includes("MONGODB_URI")) {
+    return "Missing MONGODB_URI. Add it to .env.local (your MongoDB connection string) and restart the dev server.";
+  }
+  if (msg.includes("GOOGLE_GENERATIVE_AI_API_KEY")) {
+    return "Missing GOOGLE_GENERATIVE_AI_API_KEY in .env.local. Add your Gemini API key and restart the dev server.";
+  }
+  if (/mongodb|econnrefused|enotfound|querySrv|tls|ssl|whitelist|atlas|timed out/i.test(msg)) {
+    return `Database connection failed: ${msg} For MongoDB Atlas, allow your current IP under Network Access and verify MONGODB_URI.`;
+  }
+  if (/^HTTP \d+$/i.test(msg.trim())) {
+    return `The server returned an error (${msg.trim()}). Check the terminal running Next.js for details.`;
+  }
+  if (msg.length > 0) {
+    return `Could not start a session: ${msg} You can type a message to retry.`;
+  }
+  return "I couldn’t connect to the server to start your session. This may be a network issue or the database may be unavailable. Type a message and I’ll retry automatically.";
+}
+
 interface ProfileInfo {
   accountId: string | null;
   accountName: string;
@@ -496,12 +521,24 @@ export function useChatEngine(): ChatEngine {
   );
 
   const createSession = useCallback(async (): Promise<CreateSessionResponseDto> => {
-    const response = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch {
+      throw new Error(SESSION_CREATE_NETWORK);
+    }
     if (!response.ok) {
-      throw new Error("Unable to create session");
+      let detail = "";
+      try {
+        const body = (await response.json()) as { error?: { message?: string } };
+        detail = (body?.error?.message ?? "").trim();
+      } catch {
+        /* ignore non-JSON */
+      }
+      throw new Error(detail || `HTTP ${response.status}`);
     }
     return response.json() as Promise<CreateSessionResponseDto>;
   }, []);
@@ -520,13 +557,13 @@ export function useChatEngine(): ChatEngine {
         const created = await createSession();
         if (canceled) return;
         applyServerState(created.step, created.facts, created.ui, created.sessionId);
-      } catch {
+      } catch (e) {
         if (!canceled) {
           setMessages([
             {
               id: `boot-error-${Date.now()}`,
               sender: "ai",
-              text: "I couldn’t connect to the server to start your session. This may be a network issue or the database may be unavailable. Type a message and I’ll retry automatically.",
+              text: bootstrapErrorMessage(e),
             },
           ]);
         }
@@ -968,16 +1005,18 @@ export function useChatEngine(): ChatEngine {
 
   const suggestionChips = useMemo(
     () =>
-      deriveSuggestionChips({
-        stage,
-        messages,
-        facts,
-        uploaded,
-        analysisReady,
-        isTyping,
-        isUploading,
-      }),
-    [analysisReady, facts, isTyping, isUploading, messages, stage, uploaded],
+      hasStarted
+        ? []
+        : deriveSuggestionChips({
+            stage,
+            messages,
+            facts,
+            uploaded,
+            analysisReady,
+            isTyping,
+            isUploading,
+          }),
+    [analysisReady, facts, hasStarted, isTyping, isUploading, messages, stage, uploaded],
   );
 
   /* ─── Live-poll session state so facts panel updates in real-time ─── */
