@@ -40,48 +40,48 @@ export function CliniqCaseCards({
 }) {
   return (
     <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-6">
-      <Card className="overflow-hidden border-0 bg-[linear-gradient(180deg,rgba(11,84,92,0.92),rgba(12,43,47,0.98))] text-white shadow-[0_30px_80px_rgba(4,24,27,0.35)]">
+      <Card className="overflow-hidden border-0 bg-[#cfe6bd] text-[#232634] shadow-[0_30px_80px_rgba(35,38,52,0.16)] ring-1 ring-[#9fc381]">
         <CardHeader className="gap-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Badge className="mb-3 bg-white/12 text-white ring-1 ring-white/20" variant="secondary">
+              <Badge className="mb-3 bg-white/75 text-[#232634] ring-1 ring-[#8fb873]" variant="secondary">
                 Live case file
               </Badge>
-              <CardTitle className="text-xl text-white">
+              <CardTitle className="text-xl text-[#232634]">
                 Aether
               </CardTitle>
-              <CardDescription className="mt-1 text-teal-100/78">
+              <CardDescription className="mt-1 text-[#334155]">
                 Backend-driven demo state with progressive reveal panels.
               </CardDescription>
             </div>
             <Button
               size="icon-sm"
               variant="secondary"
-              className="bg-white/10 text-white hover:bg-white/20"
+              className="bg-white/70 text-[#232634] hover:bg-white"
               onClick={onToggle}
             >
               {isOpen ? <ChevronUp /> : <ChevronDown />}
             </Button>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="border-white/15 bg-white/8 text-white">
+            <Badge variant="outline" className="border-[#8fb873] bg-white/70 text-[#232634]">
               Step: {step}
             </Badge>
-            <Badge variant="outline" className="border-white/15 bg-white/8 text-white">
+            <Badge variant="outline" className="border-[#8fb873] bg-white/70 text-[#232634]">
               Hospital: {facts.hospitalName ?? "Pending"}
             </Badge>
           </div>
         </CardHeader>
         {isOpen ? (
           <CardContent className="flex flex-col gap-4">
-            <Card className="border-0 bg-white/8 text-white shadow-none ring-1 ring-white/10">
+            <Card className="border-0 bg-white/75 text-[#232634] shadow-none ring-1 ring-[#9fc381]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <ReceiptText className="size-4 text-[#fbbf24]" />
+                <CardTitle className="flex items-center gap-2 text-[#232634]">
+                  <ReceiptText className="size-4 text-[#6f9e52]" />
                   Case snapshot
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-2 text-sm text-teal-50/90">
+              <CardContent className="grid gap-2 text-sm text-[#334155]">
                 <div className="flex justify-between gap-3">
                   <span>Estimated total</span>
                   <span>{formatMoney(facts.estimatedBillTotal)}</span>

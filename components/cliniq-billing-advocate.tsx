@@ -232,7 +232,7 @@ function IntakePanel({
           />
           <Button
             disabled={pending || !draft.trim()}
-            className="h-10 rounded-full bg-[#7a4a16] px-5 text-white hover:bg-[#63390d]"
+            className="h-10 rounded-full bg-[#a6d189] px-5 text-[#232634] hover:bg-[#94c173]"
             onClick={onSubmitDraft}
           >
             <SendHorizontal className="size-4" />
@@ -342,7 +342,7 @@ function IncomePanel({
           <Button
             disabled={pending || !incomeAmount.trim()}
             onClick={onAmountSubmit}
-            className="h-10 rounded-full bg-[#6941c6] px-5 text-white hover:bg-[#5734a7]"
+            className="h-10 rounded-full bg-[#a6d189] px-5 text-[#232634] hover:bg-[#94c173]"
           >
             Use exact income
           </Button>
@@ -430,7 +430,7 @@ function OutcomePanel({
           />
           <Button
             disabled={pending || !reducedAmount.trim()}
-            className="h-10 rounded-full bg-[#1b6f34] px-5 text-white hover:bg-[#145629]"
+            className="h-10 rounded-full bg-[#a6d189] px-5 text-[#232634] hover:bg-[#94c173]"
             onClick={() =>
               onSubmitOutcome({
                 content: `They reduced it to $${reducedAmount}.`,
@@ -767,7 +767,7 @@ export function CliniqBillingAdvocate() {
             </CardHeader>
             <CardContent>
               <Button
-                className="rounded-full bg-[#1b5b2d] px-5 text-white hover:bg-[#144722]"
+                className="rounded-full bg-[#a6d189] px-5 text-[#232634] hover:bg-[#94c173]"
                 onClick={() => {
                   initializedRef.current = false;
                   setMessages([]);
@@ -786,31 +786,30 @@ export function CliniqBillingAdvocate() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(252,221,170,0.75),transparent_28%),radial-gradient(circle_at_top_right,rgba(113,189,197,0.32),transparent_24%),linear-gradient(180deg,#fff8ee_0%,#f4fbfb_54%,#f0f6ff_100%)]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,rgba(12,58,63,0.05)_1px,transparent_1px)] bg-[size:100%_42px]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#f3f8f1]">
       <main className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_380px]">
-          <Card className="border-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(244,251,251,0.96))] shadow-[0_30px_100px_rgba(15,55,64,0.16)] ring-1 ring-[#d9eaed]">
-            <CardHeader className="gap-5 border-b border-[#d9eaed] bg-[linear-gradient(135deg,#103c44,#0b545c)] text-white">
+          <Card className="border-0 bg-white shadow-[0_30px_100px_rgba(15,55,64,0.12)] ring-1 ring-[#d9eaed]">
+            <CardHeader className="gap-5 border-b border-[#d9eaed] bg-[#a6d189] text-[#232634]">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div className="max-w-2xl">
-                  <Badge variant="secondary" className="mb-3 bg-white/12 text-white ring-1 ring-white/18">
+                  <Badge variant="secondary" className="mb-3 bg-white/70 text-[#232634] ring-1 ring-[#8fb873]">
                     Hackathon demo workflow
                   </Badge>
-                  <CardTitle className="text-3xl leading-tight text-white sm:text-4xl">
+                  <CardTitle className="text-3xl leading-tight text-[#232634] sm:text-4xl">
                     Aether
                   </CardTitle>
-                  <CardDescription className="mt-2 max-w-xl text-[0.95rem] text-teal-100/80">
+                  <CardDescription className="mt-2 max-w-xl text-[0.95rem] text-[#334155]">
                     Guided, stateful, and deterministic. The UI only reveals the next approved action while the backend controls the workflow.
                   </CardDescription>
                 </div>
-                <div className="grid gap-2 rounded-[28px] bg-white/10 p-4 text-sm text-teal-50 ring-1 ring-white/12">
+                <div className="grid gap-2 rounded-[28px] bg-white/75 p-4 text-sm text-[#334155] ring-1 ring-[#8fb873]">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-teal-100/75">Current lane</span>
+                    <span className="text-[#52606d]">Current lane</span>
                     <span className="font-medium">{guidedLabel(step, facts)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-teal-100/75">Estimated balance</span>
+                    <span className="text-[#52606d]">Estimated balance</span>
                     <span className="font-medium">{formatCaseMoney(facts.estimatedBillTotal)}</span>
                   </div>
                 </div>
@@ -859,7 +858,7 @@ export function CliniqBillingAdvocate() {
                     <Button
                       disabled={Boolean(pendingLabel) || !draft.trim()}
                       onClick={() => sendChat({ content: draft })}
-                      className="h-10 rounded-full bg-[#103c44] px-5 text-white hover:bg-[#0a2c31]"
+                      className="h-10 rounded-full bg-[#a6d189] px-5 text-[#232634] hover:bg-[#94c173]"
                     >
                       Send manual reply
                       <ArrowUpRight className="size-4" />

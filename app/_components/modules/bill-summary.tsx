@@ -29,10 +29,6 @@ export function BillSummary({ analysisReady, hospitalName, totalAmount, analysis
 
   const originalTotal = analysisSummary?.originalTotal ?? totalAmount ?? null;
   const estimatedOvercharge = analysisSummary?.estimatedOvercharge ?? null;
-  const confidence =
-    originalTotal && estimatedOvercharge !== null && originalTotal > 0
-      ? Math.min(95, Math.round((estimatedOvercharge / originalTotal) * 100 + 20))
-      : null;
 
   return (
     <div className="bill-summary">
@@ -56,7 +52,7 @@ export function BillSummary({ analysisReady, hospitalName, totalAmount, analysis
       <div className="bill-summary__right">
         {analysisReady ? (
           <div className="status-badge status-badge--complete">
-            <Check size={12} /> Analysis Complete
+            <Check size={12} /> Analysis ready
           </div>
         ) : (
           <div className="status-badge status-badge--analyzing">
@@ -65,20 +61,21 @@ export function BillSummary({ analysisReady, hospitalName, totalAmount, analysis
           </div>
         )}
 
-        <div>
-          <div className="confidence-label">Confidence in Reduction</div>
-          <div className="confidence-track">
-            <div
-              className="confidence-fill"
-              style={analysisReady ? { width: `${confidence ?? 0}%` } : { animation: "none", width: 0 }}
-            />
+        <div className="bill-summary__facts">
+          <div className="bill-summary__fact">
+            <div className="bill-summary__fact-label">Statement total</div>
+            <div className="bill-summary__fact-value">{toCurrency(originalTotal)}</div>
           </div>
-          <div className="confidence-pct">
-            {analysisReady && confidence !== null ? `${confidence}%` : "—"}
+          <div className="bill-summary__fact">
+            <div className="bill-summary__fact-label">Flagged charges</div>
+            <div className="bill-summary__fact-value">
+              {analysisReady && analysisSummary ? analysisSummary.flaggedCount : "—"}
+            </div>
           </div>
-          {analysisReady && estimatedOvercharge !== null && (
-            <div className="confidence-label">Potential savings: {toCurrency(estimatedOvercharge)}</div>
-          )}
+          <div className="bill-summary__fact">
+            <div className="bill-summary__fact-label">Possible overcharge</div>
+            <div className="bill-summary__fact-value">{toCurrency(estimatedOvercharge)}</div>
+          </div>
         </div>
       </div>
     </div>

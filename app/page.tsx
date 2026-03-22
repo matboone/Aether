@@ -35,8 +35,8 @@ export default function AetherDashboard() {
 
   /* Auto-switch to strategy tab when strategy content appears */
   useEffect(() => {
-    if (hasStrategy && rightTab === "info") {
-      /* don't auto-switch if user has already toggled manually */
+    if (!hasStrategy && rightTab === "strategy") {
+      setRightTab("info");
     }
   }, [hasStrategy, rightTab]);
 

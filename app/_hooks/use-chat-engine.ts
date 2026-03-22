@@ -170,6 +170,8 @@ const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
 
 function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
   const set = new Set<ModuleType>();
+  const strategyStillActive =
+    step !== "RESOLUTION_RECORDED" && step !== "COMPLETE";
 
   if (ui.canUploadBill) set.add("upload");
   if (ui.analysisSummary) {
@@ -184,7 +186,7 @@ function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSe
   if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
     set.add("eligibility");
   }
-  if (ui.negotiationPlan) {
+  if (ui.negotiationPlan && strategyStillActive) {
     set.add("action-plan");
     set.add("doc-chips");
     set.add("phone-script");
