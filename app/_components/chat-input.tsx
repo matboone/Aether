@@ -50,7 +50,7 @@ export function ChatInput({
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg"
           style={{ display: "none" }}
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -62,7 +62,7 @@ export function ChatInput({
         />
         <button
           className="input-icon-btn"
-          title="Attach PDF"
+          title="Attach bill file"
           onClick={() => fileInputRef.current?.click()}
         >
           <Paperclip size={16} />

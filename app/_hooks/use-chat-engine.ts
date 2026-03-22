@@ -638,12 +638,22 @@ export function useChatEngine(): ChatEngine {
 
   const handleUpload = useCallback(
     (file: File) => {
-      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      if (!isPdf) {
+      const name = file.name.toLowerCase();
+      const mime = file.type.toLowerCase();
+      const isSupportedBill =
+        mime === "application/pdf" ||
+        mime === "image/png" ||
+        mime === "image/jpeg" ||
+        name.endsWith(".pdf") ||
+        name.endsWith(".png") ||
+        name.endsWith(".jpg") ||
+        name.endsWith(".jpeg");
+
+      if (!isSupportedBill) {
         addMessage({
           id: `ai-upload-type-${Date.now()}`,
           sender: "ai",
-          text: "Please attach a PDF bill file so I can process it.",
+          text: "Please attach a bill file as PDF, PNG, or JPG so I can process it.",
         });
         return;
       }
