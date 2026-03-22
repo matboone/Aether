@@ -69,10 +69,10 @@ export function buildGuidedAssistantMessage(input: {
     }
 
     if (/requested|called the hospital|asked for it/i.test(lowerMessage)) {
-      return "Good. Once you have the itemized statement, upload it here and I will review the charges, compare them to the benchmark data, and prepare the next negotiation step.";
+      return `Perfect. Since I already have your provider and coverage context, the next step is the PDF itemized statement upload. Once you attach it, I’ll review the charges, compare them to benchmark data, and prepare your negotiation plan.`;
     }
 
-    return "Upload the itemized statement when you have it. Once it is here, I will review the charges and prepare the next step.";
+    return `I have enough context to move forward. When you’re ready, attach the PDF itemized statement and I’ll start the bill review immediately.`;
   }
 
   if (input.step === "BILL_ANALYZED" || input.step === "AWAITING_INCOME") {

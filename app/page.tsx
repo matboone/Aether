@@ -75,9 +75,11 @@ export default function AetherDashboard() {
             <div className="welcome-input-wrap">
               <ChatInput
                 stage={engine.stage}
+                suggestions={engine.suggestionChips}
                 inputValue={engine.inputValue}
                 textareaRef={engine.textareaRef}
                 onChipClick={engine.handleChipClick}
+                onAttachFile={engine.handleUpload}
                 onSend={engine.handleSend}
                 onTextareaChange={engine.handleTextareaChange}
                 onKeyDown={engine.handleKeyDown}
@@ -142,9 +144,11 @@ export default function AetherDashboard() {
 
             <ChatInput
               stage={engine.stage}
+              suggestions={engine.suggestionChips}
               inputValue={engine.inputValue}
               textareaRef={engine.textareaRef}
               onChipClick={engine.handleChipClick}
+              onAttachFile={engine.handleUpload}
               onSend={engine.handleSend}
               onTextareaChange={engine.handleTextareaChange}
               onKeyDown={engine.handleKeyDown}

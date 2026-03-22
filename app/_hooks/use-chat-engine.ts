@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type {
   ChatMessageResponseDto,
   CreateSessionResponseDto,
@@ -13,7 +13,7 @@ import type {
   SessionStep,
 } from "@/src/types/domain";
 import type { Stage, Message, ModuleType, SessionFacts } from "@/app/_types/dashboard";
-import { EMPTY_FACTS } from "@/app/_constants/dashboard";
+import { EMPTY_FACTS, SUGGESTION_CHIPS } from "@/app/_constants/dashboard";
 
 interface ProfileInfo {
   accountId: string | null;
@@ -44,6 +44,7 @@ export interface ChatEngine {
   isUploading: boolean;
   uploadFilename: string | null;
   uploadSizeLabel: string | null;
+  suggestionChips: string[];
   profile: ProfileInfo;
   rightPanelModules: ModuleType[];
   minimizedModules: Set<ModuleType>;
@@ -232,6 +233,96 @@ function toIncomeInputBracket(input: string): string {
 function shortAccount(sessionId: string | null): string {
   if (!sessionId) return "Not started";
   return `ACCT-${sessionId.slice(-6).toUpperCase()}`;
+}
+
+function uniqueFirstThree(chips: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const chip of chips) {
+    const cleaned = chip.trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(cleaned);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function deriveSuggestionChips(input: {
+  stage: Stage;
+  messages: Message[];
+  facts: SessionFacts;
+  uploaded: boolean;
+  analysisReady: boolean;
+  isTyping: boolean;
+  isUploading: boolean;
+}): string[] {
+  const chips: string[] = [];
+  const lastAi = [...input.messages].reverse().find((message) => message.sender === "ai")?.text.toLowerCase() ?? "";
+
+  if (!input.facts.hospitalName) {
+    chips.push(
+      "The bill is from Cigna Healthcare",
+      "I’m not sure which hospital billed me",
+      "Where can I find the provider name on my statement?",
+    );
+  } else if (input.facts.hasInsurance === null) {
+    chips.push(
+      "I have insurance",
+      "I’m uninsured",
+      "I’m underinsured",
+    );
+  } else if (!input.uploaded && !input.facts.uploadedBillId) {
+    chips.push(
+      "I can upload the PDF now",
+      "What counts as an itemized bill PDF?",
+      "I don’t have the PDF yet",
+    );
+  } else if (!input.analysisReady || input.stage === "BILL_PROCESSING") {
+    chips.push(
+      "What happens while this is processing?",
+      "How long does bill analysis usually take?",
+      "What will you look for in the bill?",
+    );
+  } else if (input.stage === "INCOME_CHECK" || input.stage === "ANALYSIS_COMPLETE") {
+    chips.push(
+      "Explain the biggest flagged charge",
+      "Show estimated savings",
+      "Let’s continue to income check",
+    );
+  } else if (input.stage === "ACTION_PLAN" || input.stage === "SCRIPT_GENERATED") {
+    chips.push(
+      "Give me the exact call script",
+      "What should I ask for first?",
+      "Can you draft the dispute summary?",
+    );
+  } else if (input.stage === "RESOLVED") {
+    chips.push(
+      "Summarize total savings",
+      "Help me ask for a payment plan",
+      "Start a new case",
+    );
+  }
+
+  if (lastAi.includes("itemized") || lastAi.includes("upload")) {
+    chips.push("I’m ready to upload my PDF");
+  }
+  if (lastAi.includes("income")) {
+    chips.push("Why do you need my income bracket?");
+  }
+  if (lastAi.includes("payment plan")) {
+    chips.push("What should I say to request a payment plan?");
+  }
+
+  chips.push(...(SUGGESTION_CHIPS[input.stage] ?? []));
+
+  if (input.isTyping || input.isUploading) {
+    chips.unshift("Working on that now…");
+  }
+
+  return uniqueFirstThree(chips);
 }
 
 export function useChatEngine(): ChatEngine {
@@ -486,8 +577,24 @@ export function useChatEngine(): ChatEngine {
 
   const handleUpload = useCallback(
     (file: File) => {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        addMessage({
+          id: `ai-upload-type-${Date.now()}`,
+          sender: "ai",
+          text: "Please attach a PDF bill file so I can process it.",
+        });
+        return;
+      }
+
       const run = async () => {
         try {
+          if (!hasStarted) setHasStarted(true);
+          addMessage({
+            id: `user-upload-${Date.now()}`,
+            sender: "user",
+            text: `Attached PDF: ${file.name}`,
+          });
           setIsUploading(true);
           const sid = await ensureSession();
           const formData = new FormData();
@@ -529,7 +636,7 @@ export function useChatEngine(): ChatEngine {
 
       void run();
     },
-    [addMessage, applyServerState, ensureSession, flashFact, sendChat],
+    [addMessage, applyServerState, ensureSession, flashFact, hasStarted, sendChat],
   );
 
   const handleIncomeConfirm = useCallback(() => {
@@ -647,6 +754,20 @@ export function useChatEngine(): ChatEngine {
     });
   }, []);
 
+  const suggestionChips = useMemo(
+    () =>
+      deriveSuggestionChips({
+        stage,
+        messages,
+        facts,
+        uploaded,
+        analysisReady,
+        isTyping,
+        isUploading,
+      }),
+    [analysisReady, facts, isTyping, isUploading, messages, stage, uploaded],
+  );
+
   /* ─── Live-poll session state so facts panel updates in real-time ─── */
   useEffect(() => {
     if (!sessionId) return;
@@ -686,6 +807,7 @@ export function useChatEngine(): ChatEngine {
     isUploading,
     uploadFilename,
     uploadSizeLabel,
+    suggestionChips,
     profile: {
       accountId: sessionId,
       accountName: shortAccount(sessionId),
