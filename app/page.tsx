@@ -10,7 +10,7 @@ import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 type RightTab = "info" | "strategy";
 
@@ -23,6 +23,7 @@ export default function AetherDashboard() {
   const showWelcome = !engine.hasStarted;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rightTab, setRightTab] = useState<RightTab>("info");
+  const [panelOpen, setPanelOpen] = useState(true);
 
   /* ─── Draggable panel width ─── */
   const [panelW, setPanelW] = useState(DEFAULT_PANEL_W);
@@ -142,6 +143,16 @@ export default function AetherDashboard() {
               <span key={engine.stage} className="aether-chat__breadcrumb">
                 {STAGE_LABELS[engine.stage]}
               </span>
+
+              {showRightPanel && (
+                <button
+                  className="aether-chat__panel-toggle"
+                  onClick={() => setPanelOpen((p) => !p)}
+                  aria-label={panelOpen ? "Hide side panel" : "Show side panel"}
+                >
+                  {panelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+                </button>
+              )}
             </div>
 
             <ChatThread
@@ -165,7 +176,7 @@ export default function AetherDashboard() {
       </main>
 
       {/* ─── Unified Right Panel (draggable, tabbed) ─── */}
-      {showRightPanel && (
+      {showRightPanel && panelOpen && (
         <>
           {/* Drag handle */}
           <div
@@ -217,7 +228,6 @@ export default function AetherDashboard() {
                   onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
                   onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
                   onClearSession={engine.clearSession}
-                  onOpenSettings={() => setSettingsOpen(true)}
                 />
               )}
 
