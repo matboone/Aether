@@ -740,7 +740,7 @@ export function useChatEngine(): ChatEngine {
             addMessage({
               id: `ai-upload-chat-error-${Date.now()}`,
               sender: "ai",
-              text: "Your bill was processed successfully. I couldn’t generate a response yet — please send a follow-up message.",
+              text: "Your bill was processed successfully. I couldn’t generate a response yet. Please send a follow-up message.",
             });
           }
         } catch {

@@ -5,6 +5,11 @@ import type { RenderableSessionUi, SessionFacts, SessionStep } from "@/src/types
 
 const FAST_GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
 
+/** U+2014 em dash must not appear in Aether chat copy; normalize model/draft output. */
+function withoutEmDash(text: string): string {
+  return text.replace(/\u2014/g, ", ").replace(/,\s*,+/g, ", ");
+}
+
 const fallbackMessages: Record<SessionStep, string> = {
   NEW: "Tell me the hospital name and whether you have insurance, and I will guide the next step.",
   INTAKE: "I need the hospital name and whether you have insurance before I can move you to the bill review step.",
@@ -71,6 +76,7 @@ export const llmService = {
             "Answer follow-up questions directly before suggesting a next step.",
             "Default to concise replies in 1-3 short sentences unless the user asks for more detail.",
             "Be concise, polished, and helpful.",
+            "Never use em dashes (the long \"—\" character). Use a comma, period, or semicolon instead.",
           ],
         }),
         system: [
@@ -93,7 +99,8 @@ export const llmService = {
         },
       });
 
-      const message = text.trim() || input.approvedDraft || fallbackMessages[input.step];
+      const raw = text.trim() || input.approvedDraft || fallbackMessages[input.step];
+      const message = withoutEmDash(raw);
       logInfo("llm.service", "llm.request_completed", {
         step: input.step,
         usedFallbackDraft: !text.trim(),
@@ -105,7 +112,7 @@ export const llmService = {
         step: input.step,
         approvedDraftPreview: summarizeText(input.approvedDraft),
       });
-      return input.approvedDraft || fallbackMessages[input.step];
+      return withoutEmDash(input.approvedDraft || fallbackMessages[input.step]);
     }
   },
 };

@@ -54,14 +54,14 @@ export function buildGuidedAssistantMessage(input: {
           lowerMessage,
         )
       ) {
-        return "Here’s the flow: I’ll capture who billed you and whether you have insurance, then you’ll upload an itemized bill. I compare charges to benchmarks, you pick a household income bracket for assistance rules, and I give you a negotiation checklist and call script. Who is this bill from—hospital or payer name?";
+        return "Here’s the flow: I’ll capture who billed you and whether you have insurance, then you’ll upload an itemized bill. I compare charges to benchmarks, you pick a household income bracket for assistance rules, and I give you a negotiation checklist and call script. Who is this bill from: the hospital or payer name?";
       }
       return "I can help with that. Who is the bill with?";
     }
 
     if (input.facts.hasInsurance === null || input.facts.hasInsurance === undefined) {
       if (/how does.*insurance|change the strategy|uninsured|underinsured/i.test(lowerMessage)) {
-        return `Insurance changes what you emphasize on the call—covered patients often fight EOB issues; uninsured or underinsured leans harder on assistance and self-pay discounts. First, are you insured for this visit, or uninsured?`;
+        return `Insurance changes what you emphasize on the call. Covered patients often fight EOB issues; uninsured or underinsured leans harder on assistance and self-pay discounts. First, are you insured for this visit, or uninsured?`;
       }
       return `Thanks. I have the bill with ${hospitalName}. Do you have health insurance, or are you uninsured?`;
     }
@@ -91,23 +91,23 @@ export function buildGuidedAssistantMessage(input: {
 
     if (/flagged|explain.*charg|what.*charg|line item|breakdown/i.test(latestMessage)) {
       return flaggedCount > 0
-        ? `I flagged ${flaggedCount} line item${flaggedCount === 1 ? "" : "s"} that look high versus fair benchmarks — open the Flagged Line Items module for each charge and reason${over ? ` (rough exposure above benchmark: about ${over})` : ""}. When you’re ready, pick your income bracket so I can run the assistance match.`
+        ? `I flagged ${flaggedCount} line item${flaggedCount === 1 ? "" : "s"} that look high versus fair benchmarks. Open the Flagged Line Items module for each charge and reason${over ? ` (rough exposure above benchmark: about ${over})` : ""}. When you’re ready, pick your income bracket so I can run the assistance match.`
         : "Use the Bill Summary for totals; any standout charges will appear under Flagged Line Items. Then choose your income bracket so I can tie in financial assistance rules.";
     }
     if (/saving|saved|estimated|overcharge|money back|how much can/i.test(lowerMessage)) {
       return over
-        ? `I’m estimating about ${over} in charges that may sit above typical benchmarks${total ? ` on a ${total} statement` : ""}. What you actually save depends on billing—those flagged lines are your leverage. Add your income bracket next so charity-care options show up too.`
+        ? `I’m estimating about ${over} in charges that may sit above typical benchmarks${total ? ` on a ${total} statement` : ""}. What you actually save depends on billing. Those flagged lines are your leverage. Add your income bracket next so charity-care options show up too.`
         : "Savings depend on what billing agrees to adjust. Start from the flagged charges in the module, then share your income bracket for assistance screening.";
     }
     if (/first|what should i do|where do i start|next step|walk me|step by step/i.test(lowerMessage)) {
-      return "Skim Bill Summary for totals, then Flagged Line Items for what to dispute. After that, choose your household income bracket and confirm — that’s what unlocks eligibility and your call plan.";
+      return "Skim Bill Summary for totals, then Flagged Line Items for what to dispute. After that, choose your household income bracket and confirm. That’s what unlocks eligibility and your call plan.";
     }
     if (
       /why.*income|income bracket|need.*income|privacy|comfortable.*sharing|exact income|eligib/i.test(
         lowerMessage,
       )
     ) {
-      return "I only use a broad income bracket to map you to the hospital’s financial assistance tiers—not exact salary. Pick the range that fits your household; you can use “Prefer not to say” and I’ll still give a conservative playbook.";
+      return "I only use a broad income bracket to map you to the hospital’s financial assistance tiers, not exact salary. Pick the range that fits your household; you can use “Prefer not to say” and I’ll still give a conservative playbook.";
     }
     return "I finished the analysis. Review the Bill Summary and Flagged Line Items modules, then choose your income bracket so I can build the assistance path and call plan.";
   }
@@ -118,7 +118,7 @@ export function buildGuidedAssistantMessage(input: {
         lowerMessage,
       )
     ) {
-      return "Charity care and discounts are tiered by household income vs federal poverty guidelines. I only need a coarse bracket to pick the right policy path—not paystubs. If you’d rather not say, choose “Prefer not to say” and I’ll bias the plan toward disputing flagged charges and standard discounts.";
+      return "Charity care and discounts are tiered by household income vs federal poverty guidelines. I only need a coarse bracket to pick the right policy path, not paystubs. If you’d rather not say, choose “Prefer not to say” and I’ll bias the plan toward disputing flagged charges and standard discounts.";
     }
     if (/how will income|affect.*eligib|eligib.*result|change.*outcome|income affect/i.test(lowerMessage)) {
       return `Lower brackets usually open stronger assistance at ${hospitalName}; higher brackets still get self-pay discounts and payment-plan levers. Once you confirm a bracket, I’ll show the eligibility readout and script tied to this bill.`;
@@ -129,7 +129,7 @@ export function buildGuidedAssistantMessage(input: {
     if (/walk me through|explain how|how does this work|information.*need/i.test(lowerMessage)) {
       return "Pick household size, tap the income range that fits, then Confirm Selection. That saves your bracket, runs the seeded assistance check, and loads your negotiation steps and phone script.";
     }
-    return "Review the flagged charges if you haven’t yet, then choose household size and income range in the module and tap Confirm Selection — that runs eligibility and builds your call plan.";
+    return "Review the flagged charges if you haven’t yet, then choose household size and income range in the module and tap Confirm Selection. That runs eligibility and builds your call plan.";
   }
 
   if (input.step === "STRATEGY_READY") {
@@ -146,12 +146,12 @@ export function buildGuidedAssistantMessage(input: {
         return `Based on your bracket and ${hospitalName}’s seeded policy, you’re flagged as likely eligible for assistance (${outcome ?? "review needed"}). ${rationale0 ?? "Use the Eligibility module for detail, then follow the Action Plan before you call."}`;
       }
       if (likelyEligible === false) {
-        return `With this bracket, the demo policy leans less likely for full charity care (${outcome ?? "partial options may still exist"}). ${rationale0 ?? "You can still press the flagged charges and ask for self-pay discounts—see the Action Plan."}`;
+        return `With this bracket, the demo policy leans less likely for full charity care (${outcome ?? "partial options may still exist"}). ${rationale0 ?? "You can still press the flagged charges and ask for self-pay discounts; see the Action Plan."}`;
       }
       return "Open the Eligibility card in the thread for the full readout. If anything looks off, tell me your bracket again or ask about a specific program name on your statement.";
     }
     if (/what documents|paperwork|proof|need to bring/i.test(lowerMessage)) {
-      return "Typical asks are pay stubs, tax return, or a short financial aid form—exact lists vary by hospital. Mention you’re applying for financial assistance when you call; they’ll tell you what to upload or mail.";
+      return "Typical asks are pay stubs, tax return, or a short financial aid form. Exact lists vary by hospital. Mention you’re applying for financial assistance when you call; they’ll tell you what to upload or mail.";
     }
     if (/what should i ask|ask billing|say to billing|first ask/i.test(lowerMessage)) {
       return firstInstruction

@@ -901,12 +901,13 @@
   background: rgba(166, 209, 137, 0.04) !important;
 }
 
+/* Subtle stripe — keep rows readable without strong low/high surface contrast */
 .line-item-row:nth-child(odd) {
   background: var(--clr-surface-low);
 }
 
 .line-item-row:nth-child(even) {
-  background: var(--clr-surface-high);
+  background: color-mix(in srgb, var(--clr-text) 2.5%, var(--clr-surface-low));
 }
 
 .line-item-row__desc {
@@ -2199,6 +2200,18 @@
   width: 100%;
 }
 
+/*
+ * Editorial New (Pangram Pangram Foundry): optional first choice for the welcome title.
+ * Without the file below, Bodoni Moda Italic loads via --font-aether-wordmark (layout.tsx).
+ */
+@font-face {
+  font-family: "Editorial New";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Editorial-New-Italic.woff2") format("woff2");
+}
+
 /* ─── Welcome Hero (Intro State) ─── */
 
 .welcome-hero {
@@ -2223,13 +2236,14 @@
 }
 
 .welcome-hero__title {
-  font-family: var(--font-display);
-  font-size: 2.75rem;
-  font-weight: 800;
+  font-family: "Editorial New", var(--font-aether-wordmark), Georgia, "Times New Roman", serif;
+  font-size: 2.875rem;
+  font-style: italic;
+  font-weight: 500;
   color: var(--clr-text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
   margin: 0 0 0.5rem;
-  line-height: 1.1;
+  line-height: 1.12;
 }
 
 .welcome-hero__sub {
@@ -2636,6 +2650,10 @@
 
 .module-card__min-header--static {
   cursor: default;
+}
+
+.module-card--line-items .module-card__min-header {
+  border-bottom: none;
 }
 
 .module-status-badge {

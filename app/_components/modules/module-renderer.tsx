@@ -347,11 +347,20 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
     ...extra,
   });
 
+  const baseCardClass = [
+    "module-card",
+    completionFlash && "module-card--flash-blue",
+    moduleType === "line-items" && "module-card--line-items",
+    moduleType === "bill-summary" && "module-card--bill-summary",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   /* ─── Show skeleton while "loading" ─── */
   if (loading) {
     const Skeleton = SKELETON_MAP[moduleType];
     return (
-      <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
+      <div className={baseCardClass} style={cardStyle()}>
         <Skeleton />
       </div>
     );
@@ -397,15 +406,19 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
 
   if (isMinimized && !bare) {
     return (
-      <div className={`module-card module-card--minimized ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
+      <div className={`${baseCardClass} module-card--minimized`} style={cardStyle()}>
         {MinHeader}
       </div>
     );
   }
 
-  const wrapCard = (children: React.ReactNode, extra: React.CSSProperties = {}) => (
-    <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle(extra)}>
-      {MinHeader}
+  const wrapCard = (
+    children: React.ReactNode,
+    extra: React.CSSProperties = {},
+    omitHeader = false,
+  ) => (
+    <div className={baseCardClass} style={cardStyle(extra)}>
+      {!omitHeader && MinHeader}
       {children}
     </div>
   );
@@ -432,6 +445,7 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
           analysisSummary={engine.backendUi?.analysisSummary}
         />,
         { padding: 0, overflow: "hidden" },
+        true,
       );
     case "line-items":
       return wrapCard(
