@@ -44,8 +44,6 @@ export function buildGuidedAssistantMessage(input: {
 }) {
   const latestMessage = input.latestUserMessage.trim();
   const lowerMessage = latestMessage.toLowerCase();
-  const flaggedItems = input.ui.flaggedItems ?? [];
-  const topFlags = flaggedItems.slice(0, 2);
   const hospitalName = input.facts.hospitalName ?? "the hospital";
   const hospitalPhone = input.ui.hospitalStrategy?.phoneNumber ?? "the billing number on the statement";
 
@@ -76,19 +74,7 @@ export function buildGuidedAssistantMessage(input: {
   }
 
   if (input.step === "BILL_ANALYZED" || input.step === "AWAITING_INCOME") {
-    if (!topFlags.length) {
-      return "I reviewed the statement. Before I build the negotiation plan, choose your income bracket so I can check the financial assistance path.";
-    }
-
-    const summaries = topFlags
-      .map((item) => {
-        const fairHigh = formatMoney(item.fairRangeHigh) ?? "the seeded fair range";
-        const charged = formatMoney(item.chargedAmount) ?? "the billed amount";
-        return `${item.label} is billed at ${charged} and the seeded fair ceiling is ${fairHigh}`;
-      })
-      .join("; ");
-
-    return `${summaries}. Before we negotiate, choose your income bracket so I can check the assistance path and build the call plan.`;
+    return "I finished the analysis. Review the Bill Summary and Flagged Line Items modules, then choose your income bracket so I can build the assistance path and call plan.";
   }
 
   if (input.step === "STRATEGY_READY") {

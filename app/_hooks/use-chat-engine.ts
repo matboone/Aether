@@ -671,7 +671,7 @@ export function useChatEngine(): ChatEngine {
           addMessage({
             id: `user-upload-${Date.now()}`,
             sender: "user",
-            text: `Attached PDF: ${file.name}`,
+            text: `Attached: ${file.name}`,
           });
           setIsUploading(true);
           const sid = await ensureSession();
