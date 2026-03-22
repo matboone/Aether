@@ -118,7 +118,7 @@ function mapSessionStepToStage(step: SessionStep): Stage {
   }
 }
 
-function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts): SessionFacts {
+function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: RenderableSessionUi | null): SessionFacts {
   let hasInsurance: SessionFacts["hasInsurance"] = null;
   if (facts.hasInsurance === true) hasInsurance = "insured";
   if (facts.hasInsurance === false) hasInsurance = "uninsured";
@@ -128,7 +128,14 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts): SessionFacts
   if (facts.assistanceEligible === false) assistanceEligible = "unlikely";
 
   const originalAmount = facts.negotiationOutcome?.originalAmount ?? facts.estimatedBillTotal ?? null;
-  const reducedAmount = facts.negotiationOutcome?.reducedAmount ?? null;
+  /* Derive reduced from: resolution outcome → analysis overcharge estimate → null */
+  let reducedAmount = facts.negotiationOutcome?.reducedAmount ?? null;
+  if (reducedAmount === null && ui?.analysisSummary && facts.estimatedBillTotal) {
+    reducedAmount = Math.max(0, facts.estimatedBillTotal - (ui.analysisSummary.estimatedOvercharge ?? 0));
+  }
+  if (reducedAmount === null && ui?.resolutionSummary?.reducedAmount != null) {
+    reducedAmount = ui.resolutionSummary.reducedAmount;
+  }
 
   return {
     hospitalName: facts.hospitalName ?? null,
@@ -294,7 +301,7 @@ export function useChatEngine(): ChatEngine {
       setUploaded(Boolean(domainFacts.uploadedBillId));
       setRightPanelMods(rightPanelModulesFromUi(nextStep, ui, domainFacts));
 
-      const mapped = mapDomainFactsToDashboardFacts(domainFacts);
+      const mapped = mapDomainFactsToDashboardFacts(domainFacts, ui);
       const previous = factsRef.current;
       const changed = Object.keys(mapped).filter((key) => {
         const typedKey = key as keyof SessionFacts;

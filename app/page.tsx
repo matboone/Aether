@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
 import { STAGE_LABELS } from "./_constants/dashboard";
@@ -10,15 +10,45 @@ import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
-import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+
+type RightTab = "info" | "strategy";
+
+const MIN_PANEL_W = 240;
+const MAX_PANEL_W = 520;
+const DEFAULT_PANEL_W = 290;
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
   const showWelcome = !engine.hasStarted;
-  const [factsOpen, setFactsOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<RightTab>("info");
 
-  /* Show the facts panel only once we actually have data */
+  /* ─── Draggable panel width ─── */
+  const [panelW, setPanelW] = useState(DEFAULT_PANEL_W);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startW = useRef(DEFAULT_PANEL_W);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    dragging.current = true;
+    startX.current = e.clientX;
+    startW.current = panelW;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [panelW]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const delta = startX.current - e.clientX; // leftward = wider
+    const next = Math.min(MAX_PANEL_W, Math.max(MIN_PANEL_W, startW.current + delta));
+    setPanelW(next);
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  /* Show the right panel once we have any data */
   const hasFacts =
     engine.facts.hospitalName !== null ||
     engine.facts.hasInsurance !== null ||
@@ -26,7 +56,15 @@ export default function AetherDashboard() {
     engine.facts.incomeBracket !== null ||
     engine.facts.negotiationOutcome !== null;
 
-  const hasRightPanel = engine.rightPanelModules.length > 0;
+  const hasStrategy = engine.rightPanelModules.length > 0;
+  const showRightPanel = hasFacts || hasStrategy;
+
+  /* Auto-switch to strategy tab when strategy content appears */
+  useEffect(() => {
+    if (hasStrategy && rightTab === "info") {
+      /* don't auto-switch if user has already toggled manually */
+    }
+  }, [hasStrategy, rightTab]);
 
   return (
     <div className="aether-dashboard">
@@ -43,7 +81,6 @@ export default function AetherDashboard() {
       <main className={`aether-chat ${showWelcome ? "aether-chat--welcome" : ""}`}>
         {showWelcome ? (
           <>
-            {/* ─── Centered Welcome Hero ─── */}
             <div className="welcome-hero">
               <div className="welcome-hero__monogram">A</div>
               <h1 className="welcome-hero__title">Aether</h1>
@@ -56,7 +93,6 @@ export default function AetherDashboard() {
               </p>
             </div>
 
-            {/* ─── Input (centered, inline) ─── */}
             <div className="welcome-input-wrap">
               <ChatInput
                 stage={engine.stage}
@@ -69,7 +105,6 @@ export default function AetherDashboard() {
               />
             </div>
 
-            {/* ─── Feature cards ─── */}
             <div className="welcome-features">
               <div className="welcome-feature-card">
                 <span className="welcome-feature-card__icon">📄</span>
@@ -129,49 +164,74 @@ export default function AetherDashboard() {
         )}
       </main>
 
-      {/* ─── Right Strategy Panel (action plan / docs / call script) ─── */}
-      {hasRightPanel && (
-        <aside className="aether-strategy-panel">
-          <div className="aether-strategy-panel__head">
-            <span className="aether-strategy-panel__title">Strategy</span>
-          </div>
-          <div className="aether-strategy-panel__body">
-            {engine.rightPanelModules.map((m, idx) => (
-              <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
-            ))}
-          </div>
-        </aside>
+      {/* ─── Unified Right Panel (draggable, tabbed) ─── */}
+      {showRightPanel && (
+        <>
+          {/* Drag handle */}
+          <div
+            className="right-panel__drag-handle"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          />
+
+          <aside
+            className="right-panel"
+            style={{ width: panelW }}
+          >
+            {/* Tab bar */}
+            <div className="right-panel__tabs">
+              <button
+                type="button"
+                className={`right-panel__tab ${rightTab === "info" ? "right-panel__tab--active" : ""}`}
+                onClick={() => setRightTab("info")}
+              >
+                Session Info
+              </button>
+              {hasStrategy && (
+                <button
+                  type="button"
+                  className={`right-panel__tab ${rightTab === "strategy" ? "right-panel__tab--active" : ""}`}
+                  onClick={() => setRightTab("strategy")}
+                >
+                  Strategy
+                </button>
+              )}
+            </div>
+
+            {/* Tab content */}
+            <div className="right-panel__content">
+              {rightTab === "info" && (
+                <SessionFactsPanel
+                  facts={engine.facts}
+                  flashFields={engine.flashFields}
+                  summaryExpanded={engine.summaryExpanded}
+                  openSections={engine.openSections}
+                  techIdsOpen={engine.techIdsOpen}
+                  onToggleSection={(key) =>
+                    engine.setOpenSections((prev) => ({
+                      ...prev,
+                      [key]: !prev[key],
+                    }))
+                  }
+                  onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
+                  onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
+                  onClearSession={engine.clearSession}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                />
+              )}
+
+              {rightTab === "strategy" && hasStrategy && (
+                <div className="right-panel__strategy-body">
+                  {engine.rightPanelModules.map((m, idx) => (
+                    <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
       )}
-
-      {/* ─── Facts Toggle ─── */}
-      <button
-        className={`facts-toggle-btn ${hasFacts ? "" : "facts-toggle-btn--hidden"}`}
-        onClick={() => setFactsOpen((prev) => !prev)}
-        aria-label={factsOpen ? "Hide session facts" : "Show session facts"}
-      >
-        {factsOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-      </button>
-
-      {/* ─── Session Facts Panel ─── */}
-      <div className={`aether-facts-wrap ${hasFacts ? "aether-facts-wrap--entering" : "aether-facts-wrap--hidden"} ${factsOpen ? "" : "aether-facts-wrap--collapsed"}`}>
-        <SessionFactsPanel
-          facts={engine.facts}
-          flashFields={engine.flashFields}
-          summaryExpanded={engine.summaryExpanded}
-          openSections={engine.openSections}
-          techIdsOpen={engine.techIdsOpen}
-          onToggleSection={(key) =>
-            engine.setOpenSections((prev) => ({
-              ...prev,
-              [key]: !prev[key],
-            }))
-          }
-          onToggleTechIds={() => engine.setTechIdsOpen(!engine.techIdsOpen)}
-          onToggleSummary={() => engine.setSummaryExpanded(!engine.summaryExpanded)}
-          onClearSession={engine.clearSession}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-      </div>
 
       {/* ─── Settings Dialog ─── */}
       <SettingsDialog

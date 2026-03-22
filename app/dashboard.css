@@ -271,7 +271,8 @@
 .aether-chat__thread {
   flex: 1;
   overflow-y: auto;
-  padding: 0 clamp(2rem, 10%, 8rem) 140px clamp(2.5rem, 12%, 10rem);
+  overflow-x: hidden;
+  padding: 0 clamp(1rem, 5%, 4rem) 140px clamp(1.5rem, 6%, 5rem);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -402,6 +403,8 @@
   transition: transform 150ms ease, box-shadow 150ms ease;
   max-width: 480px;
   width: 100%;
+  overflow-x: hidden;
+  word-wrap: break-word;
 }
 
 .module-card:hover {
@@ -1400,48 +1403,110 @@
 
 /* ─── Session Facts Panel ─── */
 
-/* ─── Facts Panel Wrapper (collapsible) ─── */
+/* ─── Unified Right Panel (tabbed, draggable) ─── */
 
-/* ─── Facts Panel — Modular Card Design ─── */
-
-.aether-facts-wrap {
-  display: flex;
+.right-panel {
   flex-shrink: 0;
-  width: 260px;
-  transition: width 250ms ease;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--clr-surface-container);
   overflow: hidden;
+  animation: fadeSlideIn 350ms ease-out both;
 }
 
-.aether-facts-wrap--collapsed {
-  width: 0;
-}
-
-.facts-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
+.right-panel__drag-handle {
+  width: 5px;
   flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 150ms ease;
+  align-self: stretch;
+  touch-action: none;
+}
+
+.right-panel__drag-handle:hover,
+.right-panel__drag-handle:active {
+  background: var(--clr-primary-fixed);
+}
+
+.right-panel__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--clr-outline);
+  flex-shrink: 0;
+}
+
+.right-panel__tab {
+  flex: 1;
+  padding: 0.65rem 0.5rem;
   border: none;
   background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--clr-text-muted);
   cursor: pointer;
-  transition: color 150ms ease;
-  align-self: stretch;
+  position: relative;
+  transition: color 150ms ease, background 150ms ease;
 }
 
-.facts-toggle-btn:hover {
-  color: var(--clr-text);
+.right-panel__tab:hover {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.right-panel__tab--active {
+  color: var(--clr-primary);
+}
+
+.right-panel__tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: var(--clr-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.right-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.right-panel__content::-webkit-scrollbar {
+  width: 3px;
+}
+
+.right-panel__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.right-panel__content::-webkit-scrollbar-thumb {
+  background: rgba(73, 69, 79, 0.12);
+  border-radius: var(--radius-full);
+}
+
+.right-panel__strategy-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.right-panel__strategy-body .module-card {
+  max-width: 100%;
 }
 
 .facts-panel {
-  width: 260px;
-  min-width: 260px;
-  height: 100vh;
-  background: var(--clr-surface-container);
+  width: 100%;
   overflow-y: auto;
-  padding: 1.25rem 0.875rem 1rem;
-  flex-shrink: 0;
+  padding: 0.75rem 0.875rem 1rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -1459,10 +1524,9 @@
   border-radius: var(--radius-full);
 }
 
-/* Panel header */
+/* Panel header (now provided by tab bar) */
 .facts-panel__head {
-  margin-bottom: 1rem;
-  padding: 0 0.125rem;
+  display: none;
 }
 
 .facts-panel__title {
@@ -2037,14 +2101,7 @@
 
 /* ─── Facts panel visibility (shows only when data exists) ─── */
 
-.aether-facts-wrap--hidden,
-.facts-toggle-btn--hidden {
-  display: none;
-}
-
-.aether-facts-wrap--entering {
-  animation: fadeSlideIn 350ms ease-out both;
-}
+/* (handled by right-panel now) */
 
 /* ─── Settings Dialog ─── */
 
@@ -2272,45 +2329,9 @@
   color: var(--clr-text-muted);
 }
 
-/* ─── Right Strategy Panel ─── */
+/* ─── Right Strategy Panel (merged into right-panel tabs) ─── */
 
-.aether-strategy-panel {
-  width: 320px;
-  min-width: 260px;
-  max-width: 360px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--clr-surface-low);
-  border-left: 1px solid var(--clr-outline);
-  overflow-y: auto;
-  animation: fadeSlideIn 350ms ease-out both;
-}
-
-.aether-strategy-panel__head {
-  padding: 0.875rem 1rem 0.5rem;
-  border-bottom: 1px solid var(--clr-outline);
-}
-
-.aether-strategy-panel__title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--clr-text-muted);
-}
-
-.aether-strategy-panel__body {
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.aether-strategy-panel__body .module-card {
-  max-width: 100%;
-}
+/* old separate strategy panel removed — now in .right-panel__strategy-body */
 
 /* ─── Minimizable Module Header ─── */
 

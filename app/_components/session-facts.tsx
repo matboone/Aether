@@ -148,12 +148,7 @@ export function SessionFactsPanel({
   onOpenSettings,
 }: SessionFactsProps) {
   return (
-    <aside className="facts-panel">
-      {/* Panel header */}
-      <div className="facts-panel__head">
-        <span className="facts-panel__title">Session Information</span>
-      </div>
-
+    <div className="facts-panel">
       {/* Cards */}
       <div className="facts-panel__cards">
         {/* ─ Provider ─ */}
@@ -301,6 +296,6 @@ export function SessionFactsPanel({
           Clear Session
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
