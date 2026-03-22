@@ -184,7 +184,7 @@
   flex-shrink: 0;
 }
 
-/* ─── Caduceus: Flaticon mask, primary green, 3D spin on tilted local Y ─── */
+/* ─── Caduceus: Flaticon mask, primary green, upright spin on Y ─── */
 
 .caduceus-mark {
   display: flex;
@@ -201,8 +201,7 @@
   align-items: center;
   justify-content: center;
   transform-style: preserve-3d;
-  /* Local Y ~50° down toward the lower-right; +Z = tilt to the right */
-  transform: rotateX(50deg) rotateZ(50deg);
+  /* Upright; spin is only rotateY on .caduceus-mark__spin */
 }
 
 .caduceus-mark__spin {
