@@ -2,7 +2,7 @@
    Aether — Dashboard Constants & Mock Data
    ═══════════════════════════════════════════════════════ */
 
-import { LayoutDashboard, History, FolderOpen } from "lucide-react";
+import { LayoutDashboard, History } from "lucide-react";
 import type {
   Stage,
   SessionFacts,
@@ -77,7 +77,6 @@ export const EMPTY_FACTS: SessionFacts = {
 export const SIDEBAR_ICONS = [
   { icon: LayoutDashboard, label: "Dashboard" },
   { icon: History, label: "Chat history" },
-  { icon: FolderOpen, label: "Documents" },
 ] as const;
 
 /* ─── Income Options ─── */

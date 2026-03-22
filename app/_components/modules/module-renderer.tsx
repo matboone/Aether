@@ -58,10 +58,6 @@ function SkeletonBillSummary() {
 function SkeletonLineItems() {
   return (
     <>
-      <div style={{ display: "flex", gap: "0.625rem", marginBottom: "0.75rem" }}>
-        <div className="skeleton skeleton-line skeleton-line--short" style={{ marginBottom: 0 }} />
-        <div className="skeleton" style={{ width: 70, height: 18, borderRadius: "100vmax" }} />
-      </div>
       {[1, 2, 3].map((n) => (
         <div key={n} className="skeleton" style={{ height: 36, borderRadius: "0.5rem", marginBottom: "0.375rem" }} />
       ))}
@@ -362,9 +358,21 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
   }
 
   /* ─── Minimize header (shown on all modules unless bare) ─── */
+  const lineItemsIssueCount =
+    moduleType === "line-items"
+      ? (engine.backendUi?.analysisSummary?.flaggedCount ?? engine.backendUi?.flaggedItems?.length ?? 0)
+      : null;
+
   const HeaderContent = (
     <>
-      <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      {moduleType === "line-items" ? (
+        <div className="module-card__min-left">
+          <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+          <span className="line-items__count">{lineItemsIssueCount} issues found</span>
+        </div>
+      ) : (
+        <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      )}
       <span className="module-card__min-right">
         <ModuleStatusBadge status={moduleStatus} />
         {!bare && !forceExpanded && (isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
@@ -431,7 +439,6 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
           showMore={engine.showMoreItems}
           onShowMore={() => engine.setShowMoreItems(true)}
           flaggedItems={engine.backendUi?.flaggedItems ?? []}
-          analysisSummary={engine.backendUi?.analysisSummary}
         />,
       );
     case "income-selector":

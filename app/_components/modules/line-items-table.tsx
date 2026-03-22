@@ -1,12 +1,11 @@
 "use client";
 
-import type { AnalysisSummary, FlaggedItem } from "@/src/types/domain";
+import type { FlaggedItem } from "@/src/types/domain";
 
 interface LineItemsTableProps {
   readonly showMore: boolean;
   readonly onShowMore: () => void;
   readonly flaggedItems: FlaggedItem[];
-  readonly analysisSummary?: AnalysisSummary;
 }
 
 function toCurrency(value: number): string {
@@ -17,18 +16,11 @@ function toCurrency(value: number): string {
   }).format(value);
 }
 
-export function LineItemsTable({ showMore, onShowMore, flaggedItems, analysisSummary }: LineItemsTableProps) {
+export function LineItemsTable({ showMore, onShowMore, flaggedItems }: LineItemsTableProps) {
   const visibleItems = flaggedItems.slice(0, showMore ? flaggedItems.length : 4);
 
   return (
     <>
-      <div className="line-items__header">
-        <span className="line-items__title">FLAGGED LINE ITEMS</span>
-        <span className="line-items__count">
-          {analysisSummary?.flaggedCount ?? flaggedItems.length} issues found
-        </span>
-      </div>
-
       {visibleItems.map((item) => (
         <div key={`${item.label}-${item.reason}`} className="line-item-row">
           <span className="line-item-row__desc">{item.label}</span>
