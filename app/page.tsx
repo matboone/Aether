@@ -9,8 +9,10 @@ import { ChatThread } from "./_components/chat-thread";
 import { ChatInput } from "./_components/chat-input";
 import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
+import { useTheme } from "./_hooks/use-theme";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
 import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
+import { ChatHistoryRail } from "./_components/chat-history-rail";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
 import type { ModuleType, SessionFacts } from "./_types/dashboard";
@@ -19,12 +21,12 @@ type RightTab = "info" | "strategy";
 
 const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
   "action-plan",
-  "doc-chips",
   "phone-script",
 ]);
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
+  const { isDark, toggle: toggleDark } = useTheme();
   const showWelcome = !engine.hasStarted;
   const inputBusy = engine.isTyping || engine.isUploading || engine.loadingStepNumber !== null;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -32,18 +34,6 @@ export default function AetherDashboard() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelPrimed, setPanelPrimed] = useState(false);
   const autoOpenTriggeredRef = useRef(false);
-
-  const eligibilityCompleted =
-    engine.facts.assistanceEligible === "likely" ||
-    engine.facts.assistanceEligible === "unlikely";
-
-  const strategyModules = useMemo(
-    () =>
-      engine.rightPanelModules.filter((m) =>
-        eligibilityCompleted ? true : m !== "action-plan" && m !== "phone-script",
-      ),
-    [eligibilityCompleted, engine.rightPanelModules],
-  );
 
   const revealedInlineModules = useMemo<ModuleType[]>(() => {
     if (!engine.moduleRevealMessageId) return [];
@@ -58,7 +48,6 @@ export default function AetherDashboard() {
     const visible = new Set<ModuleType>(revealedInlineModules);
     const billVisible = visible.has("bill-summary") || visible.has("line-items") || visible.has("upload");
     const eligibilityVisible = visible.has("eligibility") || visible.has("income-selector");
-    const resolutionVisible = visible.has("resolution");
 
     return {
       ...engine.facts,
@@ -69,7 +58,6 @@ export default function AetherDashboard() {
       incomeBracket: eligibilityVisible ? engine.facts.incomeBracket : null,
       householdSize: eligibilityVisible ? engine.facts.householdSize : null,
       assistanceEligible: eligibilityVisible ? engine.facts.assistanceEligible : null,
-      negotiationOutcome: resolutionVisible ? engine.facts.negotiationOutcome : null,
     };
   }, [engine.facts, revealedInlineModules]);
 
@@ -106,7 +94,11 @@ export default function AetherDashboard() {
   }, [engine.uploaded, engine.facts.uploadedBillId, panelPrimed]);
 
   return (
-    <div className="aether-dashboard">
+    <div
+      className={`aether-dashboard${
+        !showWelcome && panelOpen ? " aether-dashboard--panel-open" : ""
+      }`}
+    >
       {/* ─── Left Sidebar ─── */}
       <Sidebar
         activeNav={engine.activeNav}
@@ -115,6 +107,20 @@ export default function AetherDashboard() {
         profileName={engine.profile.accountName}
         profileStatus={engine.profile.status}
       />
+
+      <div
+        className={`chat-history-rail-outer${
+          engine.activeNav === 1 ? "" : " chat-history-rail-outer--hidden"
+        }`}
+        aria-hidden={engine.activeNav !== 1}
+      >
+        <ChatHistoryRail
+          nodes={engine.chatNodes}
+          activeSessionId={engine.sessionId}
+          isLoading={engine.isLoadingChatSession}
+          onSelectSession={engine.loadChatSession}
+        />
+      </div>
 
       {/* ─── Chat Panel ─── */}
       <main className={`aether-chat ${showWelcome ? "aether-chat--welcome" : ""}`}>
@@ -266,10 +272,20 @@ export default function AetherDashboard() {
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
-                  <StrategyChecklistPlaceholder stage={engine.stage} isLoading={engine.isTyping || engine.isUploading} />
-                  {strategyModules.map((m, idx) => (
-                    <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
-                  ))}
+                  <StrategyChecklistPlaceholder
+                    isLoading={engine.isTyping || engine.isUploading}
+                    facts={engine.facts}
+                    hasNegotiationPlan={Boolean(engine.backendUi?.negotiationPlan)}
+                    hasPhoneScript={Boolean(
+                      engine.backendUi?.negotiationPlan?.phoneScript &&
+                        engine.backendUi.negotiationPlan.phoneScript.length > 0,
+                    )}
+                  />
+                  {engine.rightPanelModules
+                    .filter((m) => m !== "action-plan")
+                    .map((m, idx) => (
+                      <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
+                    ))}
                 </div>
               )}
             </div>
@@ -281,6 +297,8 @@ export default function AetherDashboard() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         profile={engine.profile}
+        isDark={isDark}
+        onToggleDark={toggleDark}
       />
     </div>
   );

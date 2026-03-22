@@ -2,7 +2,6 @@ import { HospitalPolicyModel } from "@/src/models/hospital-policy.model";
 import { normalizeText } from "@/src/lib/normalize";
 import { ApiError } from "@/src/lib/api";
 import { logInfo } from "@/src/lib/logger";
-import { hospitalPoliciesSeed } from "@/src/seeds/data";
 import type { LookupHospitalPolicyOutputDto } from "@/src/types/dto";
 
 function toPolicyDto(policy: {
@@ -33,12 +32,6 @@ export const hospitalService = {
   async lookupHospitalPolicy(input: { hospitalName: string }) {
     const rawName = input.hospitalName.trim();
     const normalized = normalizeText(rawName);
-    const seededFallback = toPolicyDto({
-      _id: {
-        toString: () => "seeded-cigna-healthcare",
-      },
-      ...hospitalPoliciesSeed[0],
-    });
 
     const allPolicies = await HospitalPolicyModel.find().lean();
     const exactCanonical = allPolicies.find(
@@ -70,10 +63,13 @@ export const hospitalService = {
       return canonical.includes(normalized) || normalized.includes(canonical);
     });
 
-    const result = containsMatch ? toPolicyDto(containsMatch) : seededFallback;
+    const result = containsMatch ? toPolicyDto(containsMatch) : null;
+    if (!result) {
+      throw new ApiError("HOSPITAL_NOT_FOUND", `No hospital policy found for "${rawName}"`, 404);
+    }
     logInfo("hospital.service", "hospital.lookup", {
       inputHospitalName: rawName,
-      matchType: containsMatch ? "contains" : "seeded_fallback",
+      matchType: "contains",
       matchedHospital: result.canonicalName,
     });
     return result;

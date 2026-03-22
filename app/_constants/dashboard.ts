@@ -2,7 +2,7 @@
    Aether — Dashboard Constants & Mock Data
    ═══════════════════════════════════════════════════════ */
 
-import { LayoutDashboard, FileText, FolderOpen } from "lucide-react";
+import { LayoutDashboard, History } from "lucide-react";
 import type {
   Stage,
   SessionFacts,
@@ -76,8 +76,7 @@ export const EMPTY_FACTS: SessionFacts = {
 
 export const SIDEBAR_ICONS = [
   { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: FileText, label: "Bills" },
-  { icon: FolderOpen, label: "Documents" },
+  { icon: History, label: "Chat history" },
 ] as const;
 
 /* ─── Income Options ─── */
@@ -90,6 +89,20 @@ export const INCOME_OPTIONS = [
   "$80k+",
   "Prefer not to say",
 ];
+
+/** API/session stores normalized keys; UI shows these labels (Session Info, income state). */
+export const INCOME_BRACKET_SERVER_TO_LABEL: Record<string, string> = {
+  "0_50k": "$40k\u2013$60k",
+  "50k_80k": "$60k\u2013$80k",
+  "80k_plus": "$80k+",
+};
+
+export function formatIncomeBracketLabel(
+  bracket: string | null | undefined,
+): string | null {
+  if (bracket == null || bracket === "") return null;
+  return INCOME_BRACKET_SERVER_TO_LABEL[bracket] ?? bracket;
+}
 
 /* ─── Line Items Mock Data ─── */
 

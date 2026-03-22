@@ -10,8 +10,8 @@ import type {
 import type { ClassifyBillItemsOutputDto } from "@/src/types/dto";
 
 export function extractEmbeddedProcedureCode(label: string): string | null {
-  const match = label.match(/\b(\d{5})\b/);
-  return match?.[1] ?? null;
+  const match = label.match(/(?:CPT|HCPCS)[:\s#-]*(\d{5})|\((\d{5})\)/i);
+  return match?.[1] ?? match?.[2] ?? null;
 }
 
 function benchmarkToLeanMatch(benchmark: {

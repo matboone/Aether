@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { SessionFacts } from "@/app/_types/dashboard";
+import { formatIncomeBracketLabel } from "@/app/_constants/dashboard";
 
 /* ─── Modular Fact Card ─── */
 
@@ -227,7 +228,13 @@ export function SessionFactsPanel({
           status={getEligibilityStatus(facts)}
         >
           <FactRow label="Income" flash={flashFields.has("incomeBracket")}>
-            {facts.incomeBracket ? <Badge variant="primary">{facts.incomeBracket}</Badge> : <EmptyVal />}
+            {facts.incomeBracket ? (
+              <Badge variant="primary">
+                {formatIncomeBracketLabel(facts.incomeBracket) ?? facts.incomeBracket}
+              </Badge>
+            ) : (
+              <EmptyVal />
+            )}
           </FactRow>
           <FactRow label="Household" flash={flashFields.has("householdSize")}>
             {facts.householdSize ? <Badge variant="primary">{facts.householdSize}</Badge> : <EmptyVal />}
@@ -277,7 +284,7 @@ export function SessionFactsPanel({
             </>
           ) : (
             <span className="fact-kv__empty" style={{ fontSize: "0.7rem" }}>
-              Not yet resolved
+              Not yet recorded
             </span>
           )}
         </FactCard>

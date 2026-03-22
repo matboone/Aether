@@ -8,7 +8,6 @@ import { ModuleRenderer } from "./modules/module-renderer";
 /* Right-side module types that render in the strategy panel, not inline */
 const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
   "action-plan",
-  "doc-chips",
   "phone-script",
 ]);
 
@@ -136,10 +135,18 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
         const delayIncomeModule =
           allModulesForMsg.includes("income-selector") &&
           !incomeModuleReadyIds.has(msg.id);
-        const visibleModules = delayIncomeModule ? [] : modulesForMsg;
+        /* Only defer the income block — hiding all modules made bill summary unusable */
+        const visibleModules = modulesForMsg.filter((m) => {
+          if (m !== "income-selector") return true;
+          return !delayIncomeModule;
+        });
         const hasText = msg.text.trim().length > 0;
         return (
-          <div key={msg.id} className={`msg-wrapper msg-wrapper--${msg.sender}`}>
+          <div
+            key={msg.id}
+            id={`aether-msg-${msg.id}`}
+            className={`msg-wrapper msg-wrapper--${msg.sender}`}
+          >
             {msg.sender === "ai" && <div className="msg-avatar">A</div>}
             <div>
               {hasText && !delayBracketBubble && (

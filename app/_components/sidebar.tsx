@@ -25,7 +25,14 @@ export function Sidebar({ activeNav, onNavChange, onOpenSettings, profileName, p
             className={`aether-sidebar__icon ${
               i === activeNav ? "aether-sidebar__icon--active" : ""
             }`}
-            onClick={() => onNavChange(i)}
+            onClick={() => {
+              /* Chat history (index 1): second click closes the rail */
+              if (i === 1 && activeNav === 1) {
+                onNavChange(0);
+              } else {
+                onNavChange(i);
+              }
+            }}
             title={label}
           >
             <Icon size={18} />

@@ -11,6 +11,8 @@ interface SettingsDialogProps {
     accountName: string;
     status: string;
   };
+  readonly isDark: boolean;
+  readonly onToggleDark: () => void;
 }
 
 function ToggleSwitch({
@@ -33,8 +35,7 @@ function ToggleSwitch({
   );
 }
 
-export function SettingsDialog({ open, onClose, profile }: SettingsDialogProps) {
-  const [darkMode, setDarkMode] = useState(false);
+export function SettingsDialog({ open, onClose, profile, isDark, onToggleDark }: SettingsDialogProps) {
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
   const [dataSharing, setDataSharing] = useState(false);
@@ -89,10 +90,10 @@ export function SettingsDialog({ open, onClose, profile }: SettingsDialogProps) 
             <div className="settings-section__label">Appearance</div>
             <div className="settings-row">
               <div className="settings-row__info">
-                {darkMode ? <Moon size={16} /> : <Sun size={16} />}
+                {isDark ? <Moon size={16} /> : <Sun size={16} />}
                 <span>Dark mode</span>
               </div>
-              <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
+              <ToggleSwitch checked={isDark} onChange={() => onToggleDark()} />
             </div>
           </div>
 

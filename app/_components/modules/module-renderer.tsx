@@ -58,10 +58,6 @@ function SkeletonBillSummary() {
 function SkeletonLineItems() {
   return (
     <>
-      <div style={{ display: "flex", gap: "0.625rem", marginBottom: "0.75rem" }}>
-        <div className="skeleton skeleton-line skeleton-line--short" style={{ marginBottom: 0 }} />
-        <div className="skeleton" style={{ width: 70, height: 18, borderRadius: "100vmax" }} />
-      </div>
       {[1, 2, 3].map((n) => (
         <div key={n} className="skeleton" style={{ height: 36, borderRadius: "0.5rem", marginBottom: "0.375rem" }} />
       ))}
@@ -287,9 +283,12 @@ function ModuleStatusBadge({ status }: { readonly status: ModuleStatus }) {
   }
   if (status === "blocked") {
     return (
-      <span className="module-status-badge module-status-badge--blocked">
+      <span
+        className="module-status-badge module-status-badge--blocked module-status-badge--icon-only"
+        title="Ineligible"
+        aria-label="Ineligible"
+      >
         <CircleX size={12} />
-        X
       </span>
     );
   }
@@ -348,20 +347,41 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
     ...extra,
   });
 
+  const baseCardClass = [
+    "module-card",
+    completionFlash && "module-card--flash-blue",
+    moduleType === "line-items" && "module-card--line-items",
+    moduleType === "bill-summary" && "module-card--bill-summary",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   /* ─── Show skeleton while "loading" ─── */
   if (loading) {
     const Skeleton = SKELETON_MAP[moduleType];
     return (
-      <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
+      <div className={baseCardClass} style={cardStyle()}>
         <Skeleton />
       </div>
     );
   }
 
   /* ─── Minimize header (shown on all modules unless bare) ─── */
+  const lineItemsIssueCount =
+    moduleType === "line-items"
+      ? (engine.backendUi?.analysisSummary?.flaggedCount ?? engine.backendUi?.flaggedItems?.length ?? 0)
+      : null;
+
   const HeaderContent = (
     <>
-      <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      {moduleType === "line-items" ? (
+        <div className="module-card__min-left">
+          <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+          <span className="line-items__count">{lineItemsIssueCount} issues found</span>
+        </div>
+      ) : (
+        <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
+      )}
       <span className="module-card__min-right">
         <ModuleStatusBadge status={moduleStatus} />
         {!bare && !forceExpanded && (isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
@@ -386,15 +406,19 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
 
   if (isMinimized && !bare) {
     return (
-      <div className={`module-card module-card--minimized ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle()}>
+      <div className={`${baseCardClass} module-card--minimized`} style={cardStyle()}>
         {MinHeader}
       </div>
     );
   }
 
-  const wrapCard = (children: React.ReactNode, extra: React.CSSProperties = {}) => (
-    <div className={`module-card ${completionFlash ? "module-card--flash-blue" : ""}`} style={cardStyle(extra)}>
-      {MinHeader}
+  const wrapCard = (
+    children: React.ReactNode,
+    extra: React.CSSProperties = {},
+    omitHeader = false,
+  ) => (
+    <div className={baseCardClass} style={cardStyle(extra)}>
+      {!omitHeader && MinHeader}
       {children}
     </div>
   );
@@ -421,6 +445,7 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
           analysisSummary={engine.backendUi?.analysisSummary}
         />,
         { padding: 0, overflow: "hidden" },
+        true,
       );
     case "line-items":
       return wrapCard(
@@ -428,7 +453,6 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
           showMore={engine.showMoreItems}
           onShowMore={() => engine.setShowMoreItems(true)}
           flaggedItems={engine.backendUi?.flaggedItems ?? []}
-          analysisSummary={engine.backendUi?.analysisSummary}
         />,
       );
     case "income-selector":

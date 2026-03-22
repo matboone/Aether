@@ -13,7 +13,30 @@ import type {
   SessionStep,
 } from "@/src/types/domain";
 import type { Stage, Message, ModuleType, SessionFacts } from "@/app/_types/dashboard";
-import { EMPTY_FACTS, SUGGESTION_CHIPS } from "@/app/_constants/dashboard";
+import {
+  EMPTY_FACTS,
+  INCOME_BRACKET_SERVER_TO_LABEL,
+  SUGGESTION_CHIPS,
+  formatIncomeBracketLabel,
+} from "@/app/_constants/dashboard";
+import type { GetSessionResponseDto } from "@/src/types/dto";
+import { deriveSessionBillTitle } from "@/app/_lib/derive-session-bill-title";
+import { loadChatNodes, upsertChatNode, type ChatHistoryNode } from "@/app/_lib/chat-history-storage";
+import {
+  nextModules,
+  rightPanelModulesFromUi,
+  RIGHT_PANEL_MODULE_TYPES,
+} from "@/app/_lib/session-modules";
+
+/** Pill label → API bracket (must stay in sync with app/_constants/dashboard INCOME_OPTIONS) */
+const UI_LABEL_TO_SERVER_BRACKET: Record<string, string> = {
+  "Under $25k": "0_50k",
+  "$25k\u2013$40k": "0_50k",
+  "$40k\u2013$60k": "0_50k",
+  "$60k\u2013$80k": "50k_80k",
+  "$80k+": "80k_plus",
+  "Prefer not to say": "80k_plus",
+};
 
 interface ProfileInfo {
   accountId: string | null;
@@ -71,25 +94,20 @@ export interface ChatEngine {
   setActiveNav: (v: number) => void;
   setOpenSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setTechIdsOpen: (v: boolean) => void;
-}
 
-const MODULE_ORDER: ModuleType[] = [
-  "upload",
-  "bill-summary",
-  "line-items",
-  "income-selector",
-  "eligibility",
-  "action-plan",
-  "doc-chips",
-  "phone-script",
-  "resolution",
-];
+  chatNodes: ChatHistoryNode[];
+  loadChatSession: (sessionId: string) => Promise<void>;
+  isLoadingChatSession: boolean;
+}
 
 const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
   "bill-summary",
   "line-items",
   "eligibility",
 ]);
+
+/** Strategy tab: ensure phone script slot early; action plan stays out of this panel (checklist covers progress). */
+const STRATEGY_TAB_MODULES_ORDER: ModuleType[] = ["phone-script"];
 
 const MODULE_REVEAL_INTERVAL_MS = 1200;
 
@@ -158,7 +176,7 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: Renderab
     uploadedBillId: facts.uploadedBillId ?? null,
     parsedBillId: facts.parsedBillId ?? null,
     analysisId: facts.analysisId ?? null,
-    incomeBracket: facts.incomeBracket ?? null,
+    incomeBracket: formatIncomeBracketLabel(facts.incomeBracket),
     householdSize: facts.householdSize ?? null,
     assistanceEligible,
     negotiationOutcome:
@@ -173,49 +191,27 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: Renderab
   };
 }
 
-/* Modules that belong in the right strategy panel instead of inline in chat */
-const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
-  "action-plan",
-  "doc-chips",
-  "phone-script",
-]);
-
-function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
-  const set = new Set<ModuleType>();
-  const strategyStillActive =
-    step !== "RESOLUTION_RECORDED" && step !== "COMPLETE";
-
-  if (ui.canUploadBill) set.add("upload");
-  if (ui.analysisSummary) {
-    set.add("bill-summary");
-    if ((ui.flaggedItems?.length ?? 0) > 0) {
-      set.add("line-items");
+function mapServerRowsToMessages(
+  rows: Array<{ id: string; role: string; content: string }>,
+  step: SessionStep,
+  ui: RenderableSessionUi,
+  facts: DomainSessionFacts,
+): Message[] {
+  const chat: Message[] = [];
+  for (const row of rows) {
+    if (row.role === "system") continue;
+    const sender = row.role === "assistant" ? "ai" : "user";
+    chat.push({ id: row.id, sender, text: row.content });
+  }
+  const inlineMods = nextModules(step, ui, facts).filter((m) => !RIGHT_PANEL_MODULE_TYPES.has(m));
+  if (inlineMods.length === 0) return chat;
+  for (let i = chat.length - 1; i >= 0; i -= 1) {
+    if (chat[i].sender === "ai") {
+      chat[i] = { ...chat[i], modules: inlineMods };
+      break;
     }
   }
-  if (step === "AWAITING_INCOME") {
-    set.add("income-selector");
-  }
-  if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
-    set.add("eligibility");
-  }
-  if (ui.negotiationPlan && strategyStillActive) {
-    set.add("action-plan");
-    set.add("doc-chips");
-    set.add("phone-script");
-    if (ui.negotiationPlan.assistanceAssessment) {
-      set.add("eligibility");
-    }
-  }
-  /* Resolution only once session is truly complete */
-  if (ui.resolutionSummary && (step === "RESOLUTION_RECORDED" || step === "COMPLETE")) {
-    set.add("resolution");
-  }
-
-  return MODULE_ORDER.filter((moduleType) => set.has(moduleType));
-}
-
-function rightPanelModulesFromUi(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
-  return nextModules(step, ui, facts).filter((m) => RIGHT_PANEL_MODULE_TYPES.has(m));
+  return chat;
 }
 
 function formatFileSize(bytes: number): string {
@@ -225,20 +221,8 @@ function formatFileSize(bytes: number): string {
 }
 
 function toIncomeInputBracket(input: string): string {
-  const lower = input.toLowerCase();
-  if (lower.includes("under") || lower.includes("25") || lower.includes("40") || lower.includes("60")) {
-    return "0_50k";
-  }
-  if (lower.includes("60") || lower.includes("80")) {
-    return "50k_80k";
-  }
-  if (lower.includes("prefer")) {
-    return "80k_plus";
-  }
-  if (lower.includes("80") || lower.includes("plus")) {
-    return "80k_plus";
-  }
-  return "50k_80k";
+  const trimmed = input.trim();
+  return UI_LABEL_TO_SERVER_BRACKET[trimmed] ?? "0_50k";
 }
 
 function shortAccount(sessionId: string | null): string {
@@ -418,11 +402,15 @@ export function useChatEngine(): ChatEngine {
   const [moduleRevealMessageId, setModuleRevealMessageId] = useState<string | null>(null);
   const [moduleRevealCount, setModuleRevealCount] = useState(0);
   const [loadingStepNumber, setLoadingStepNumber] = useState<number | null>(null);
+  const [chatNodes, setChatNodes] = useState<ChatHistoryNode[]>([]);
+  const [isLoadingChatSession, setIsLoadingChatSession] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const factsRef = useRef<SessionFacts>(facts);
   const sessionIdRef = useRef<string | null>(sessionId);
+  const backendUiRef = useRef<RenderableSessionUi | null>(null);
+  const uploadFilenameRef = useRef<string | null>(null);
   const manuallyExpandedModulesRef = useRef<Set<ModuleType>>(new Set());
   const revealTimersRef = useRef<number[]>([]);
 
@@ -433,6 +421,18 @@ export function useChatEngine(): ChatEngine {
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  useEffect(() => {
+    backendUiRef.current = backendUi;
+  }, [backendUi]);
+
+  useEffect(() => {
+    uploadFilenameRef.current = uploadFilename;
+  }, [uploadFilename]);
+
+  useEffect(() => {
+    setChatNodes(loadChatNodes());
+  }, []);
 
   const flashFact = useCallback((field: string) => {
     setFlashFields((prev) => new Set(prev).add(field));
@@ -487,7 +487,8 @@ export function useChatEngine(): ChatEngine {
       changed.forEach((key) => flashFact(key));
 
       if (domainFacts.incomeBracket) {
-        setSelectedIncome(domainFacts.incomeBracket);
+        const raw = domainFacts.incomeBracket;
+        setSelectedIncome(INCOME_BRACKET_SERVER_TO_LABEL[raw] ?? raw);
         setIncomeConfirmed(true);
       }
     },
@@ -525,7 +526,7 @@ export function useChatEngine(): ChatEngine {
             {
               id: `boot-error-${Date.now()}`,
               sender: "ai",
-              text: "I couldn’t initialize your session yet. You can still type a message and I’ll retry.",
+              text: "I couldn’t connect to the server to start your session. This may be a network issue or the database may be unavailable. Type a message and I’ll retry automatically.",
             },
           ]);
         }
@@ -660,11 +661,15 @@ export function useChatEngine(): ChatEngine {
         try {
           setIsTyping(true);
           await sendChat(msg);
-        } catch {
+        } catch (err) {
+          const detail =
+            err instanceof Error && err.message === "Unable to send message"
+              ? "The server returned an error."
+              : "Could not reach the server.";
           addMessage({
             id: `ai-error-${Date.now()}`,
             sender: "ai",
-            text: "I hit a connection issue while sending that. Please retry.",
+            text: `I couldn’t process that message. ${detail} Please try again.`,
           });
         } finally {
           setIsTyping(false);
@@ -732,12 +737,20 @@ export function useChatEngine(): ChatEngine {
           const processData = (await processResponse.json()) as ProcessBillResponseDto;
           applyServerState(processData.step, processData.facts, processData.ui, processData.sessionId);
 
-          await sendChat(`I uploaded ${uploadData.filename}.`);
+          try {
+            await sendChat(`I uploaded ${uploadData.filename}.`);
+          } catch {
+            addMessage({
+              id: `ai-upload-chat-error-${Date.now()}`,
+              sender: "ai",
+              text: "Your bill was processed successfully. I couldn’t generate a response yet. Please send a follow-up message.",
+            });
+          }
         } catch {
           addMessage({
             id: `ai-upload-error-${Date.now()}`,
             sender: "ai",
-            text: "I couldn’t process that file. Please try uploading again.",
+            text: "I couldn’t upload or process that file. Please check your connection and try again.",
           });
         } finally {
           setIsTyping(false);
@@ -784,7 +797,87 @@ export function useChatEngine(): ChatEngine {
     void run();
   }, [addMessage, householdSize, selectedIncome, sendChat]);
 
+  const loadChatSession = useCallback(
+    async (targetId: string) => {
+      if (!targetId || targetId === sessionIdRef.current) return;
+      setIsLoadingChatSession(true);
+      clearRevealTimers();
+      try {
+        const [sessResp, msgResp] = await Promise.all([
+          fetch(`/api/sessions/${targetId}`),
+          fetch(`/api/sessions/${targetId}/messages`),
+        ]);
+        if (!sessResp.ok) throw new Error("session");
+        const data = (await sessResp.json()) as GetSessionResponseDto;
+        let rows: Array<{ id: string; role: string; content: string }> = [];
+        if (msgResp.ok) {
+          const msgData = (await msgResp.json()) as {
+            messages?: Array<{ id: string; role: string; content: string }>;
+          };
+          rows = msgData.messages ?? [];
+        }
+        const hydrated = mapServerRowsToMessages(rows, data.step, data.ui, data.facts);
+        const inlineMods = nextModules(data.step, data.ui, data.facts).filter(
+          (m) => !RIGHT_PANEL_MODULE_TYPES.has(m),
+        );
+        let lastAiId: string | null = null;
+        for (let i = hydrated.length - 1; i >= 0; i -= 1) {
+          if (hydrated[i].sender === "ai") {
+            lastAiId = hydrated[i].id;
+            break;
+          }
+        }
+
+        if (!data.facts.incomeBracket) {
+          setSelectedIncome(null);
+          setIncomeConfirmed(false);
+        }
+        setHouseholdSize(data.facts.householdSize ?? 1);
+
+        applyServerState(data.step, data.facts, data.ui, data.sessionId);
+        setMessages(hydrated);
+        setHasStarted(true);
+        setModuleRevealMessageId(lastAiId);
+        setModuleRevealCount(inlineMods.length);
+        setLoadingStepNumber(null);
+        setInputValue("");
+        setIsTyping(false);
+        setIsUploading(false);
+        manuallyExpandedModulesRef.current = new Set();
+
+        const dashboardFacts = mapDomainFactsToDashboardFacts(data.facts, data.ui);
+        const title = deriveSessionBillTitle({
+          facts: dashboardFacts,
+          backendUi: data.ui,
+          uploadFilename: null,
+          hasStarted: true,
+        });
+        setChatNodes(upsertChatNode({ sessionId: data.sessionId, title, updatedAt: Date.now() }));
+      } catch {
+        addMessage({
+          id: `ai-load-${Date.now()}`,
+          sender: "ai",
+          text: "Couldn’t load that conversation. It may have been removed or the server is unreachable.",
+        });
+      } finally {
+        setIsLoadingChatSession(false);
+      }
+    },
+    [addMessage, applyServerState, clearRevealTimers],
+  );
+
   const clearSession = useCallback(() => {
+    const sid = sessionIdRef.current;
+    if (sid && hasStarted) {
+      const title = deriveSessionBillTitle({
+        facts: factsRef.current,
+        backendUi: backendUiRef.current,
+        uploadFilename: uploadFilenameRef.current,
+        hasStarted: true,
+      });
+      setChatNodes(upsertChatNode({ sessionId: sid, title, updatedAt: Date.now() }));
+    }
+
     setStage("INTRO");
     setMessages([]);
     setFacts({ ...EMPTY_FACTS });
@@ -827,7 +920,7 @@ export function useChatEngine(): ChatEngine {
     };
 
     void run();
-  }, [addMessage, applyServerState, clearRevealTimers, createSession]);
+  }, [addMessage, applyServerState, clearRevealTimers, createSession, hasStarted]);
 
   const handleChipClick = useCallback(
     (text: string) => {
@@ -888,8 +981,14 @@ export function useChatEngine(): ChatEngine {
   );
 
   /* ─── Live-poll session state so facts panel updates in real-time ─── */
+  const ACTIVE_POLL_STEPS: Set<SessionStep> = useMemo(
+    () => new Set(["BILL_UPLOADED", "BILL_PARSED", "BILL_ANALYZED"]),
+    [],
+  );
+
   useEffect(() => {
     if (!sessionId) return;
+    const pollMs = ACTIVE_POLL_STEPS.has(stage as SessionStep) ? 4000 : 10000;
     const interval = setInterval(async () => {
       try {
         const resp = await fetch(`/api/sessions/${sessionId}`);
@@ -899,9 +998,17 @@ export function useChatEngine(): ChatEngine {
       } catch {
         /* silent — best-effort polling */
       }
-    }, 4000);
+    }, pollMs);
     return () => clearInterval(interval);
-  }, [sessionId, applyServerState]);
+  }, [sessionId, stage, applyServerState, ACTIVE_POLL_STEPS]);
+
+  const rightPanelModules = useMemo(() => {
+    if (!hasStarted) return rightPanelMods;
+    if (stage === "RESOLVED") return rightPanelMods;
+    const merged = new Set(rightPanelMods);
+    for (const m of STRATEGY_TAB_MODULES_ORDER) merged.add(m);
+    return STRATEGY_TAB_MODULES_ORDER.filter((m) => merged.has(m));
+  }, [rightPanelMods, hasStarted, stage]);
 
   return {
     stage,
@@ -932,7 +1039,7 @@ export function useChatEngine(): ChatEngine {
       accountName: shortAccount(sessionId),
       status: stage.replaceAll("_", " "),
     },
-    rightPanelModules: rightPanelMods,
+    rightPanelModules,
     minimizedModules,
     moduleRevealMessageId,
     moduleRevealCount,
@@ -955,5 +1062,8 @@ export function useChatEngine(): ChatEngine {
     setActiveNav,
     setOpenSections,
     setTechIdsOpen,
+    chatNodes,
+    loadChatSession,
+    isLoadingChatSession,
   };
 }
