@@ -199,9 +199,9 @@ const SKELETON_MAP: Record<ModuleType, React.FC> = {
 
 /* Loading durations per module type (ms) */
 const LOAD_DELAYS: Partial<Record<ModuleType, number>> = {
-  "bill-summary": 1000,
-  "line-items": 1500,
-  "eligibility": 2000,
+  "bill-summary": 900,
+  "line-items": 1900,
+  "eligibility": 2900,
   "action-plan": 500,
   "doc-chips": 400,
   "phone-script": 600,
