@@ -164,12 +164,12 @@ export const LINE_ITEMS: LineItem[] = [
 export const ACTION_STEPS: ActionStep[] = [
   {
     title: "Request Itemized Bill",
-    desc: "Get a detailed breakdown of every charge from TriStar\u2019s billing department.",
+    desc: "Get a detailed breakdown of every charge from Cigna\u2019s billing department.",
     status: "completed",
   },
   {
-    title: "Apply for Charity Care",
-    desc: "Submit HCA\u2019s financial assistance application with income documentation.",
+    title: "Apply for Financial Assistance",
+    desc: "Submit Cigna\u2019s financial assistance application with income documentation.",
     status: "active",
   },
   {
@@ -188,8 +188,8 @@ export const ACTION_STEPS: ActionStep[] = [
 
 export const DOCUMENTS: Document[] = [
   { name: "Dispute Letter", status: "Ready" },
-  { name: "Charity Care Application", status: "Ready" },
-  { name: "Call Script \u2014 TriStar Billing", status: "Ready" },
+  { name: "Financial Assistance Application", status: "Ready" },
+  { name: "Call Script \u2014 Cigna Billing", status: "Ready" },
   { name: "Payment Plan Request", status: "Draft" },
 ];
 
@@ -203,7 +203,7 @@ export const SCRIPT_SECTIONS: ScriptSection[] = [
   },
   {
     label: "KEY ASK",
-    text: "I\u2019d like to apply for your financial assistance program. I understand TriStar has charity care for patients under 200% of the Federal Poverty Level, and I believe I qualify based on my household income.",
+    text: "I\u2019d like to apply for your financial assistance program. I understand Cigna offers financial assistance for members who qualify based on household income, and I believe I qualify.",
     isChip: false,
   },
   {
@@ -213,7 +213,7 @@ export const SCRIPT_SECTIONS: ScriptSection[] = [
   },
   {
     label: "BILLING DIRECT LINE",
-    text: "615-342-1000 \u2192 Press 3 \u2192 Press 2 \u2192 Ask for Financial Counseling",
+    text: "615-450-5591 \u2192 Billing \u2192 Member Support \u2192 Ask for Financial Assistance",
     isChip: true,
   },
 ];

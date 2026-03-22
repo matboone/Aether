@@ -7,7 +7,7 @@ export function BillReceipt() {
     <div className="bill-receipt">
       <FileText size={20} className="bill-receipt__icon" />
       <div className="bill-receipt__info">
-        <div className="bill-receipt__name">TriStar_Invoice_89211.pdf</div>
+        <div className="bill-receipt__name">cigna-itemized-statement.pdf</div>
         <div className="bill-receipt__size">2.4 MB</div>
       </div>
       <div className="bill-receipt__badge">
