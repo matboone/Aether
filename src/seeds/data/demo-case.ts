@@ -10,9 +10,9 @@ export const demoStatement = {
   filenameBase: "cigna-itemized-statement",
   invoiceNumber: "2001321",
   statementDate: "9/27/2023",
-  patientName: "Rhonda Wesley Taylor",
-  patientAddressLine1: "628 Providence Lane",
-  patientAddressLine2: "Hartsville, TN 37074",
+  patientName: "Test Patient",
+  patientAddressLine1: "123 Demo St",
+  patientAddressLine2: "Demo City, TN 00000",
   totalAmount: 862,
   sourceType: "itemized_statement" as const,
   lineItems: [
