@@ -190,7 +190,7 @@
   flex-shrink: 0;
 }
 
-/* ─── Caduceus (Flaticon mask + primary green + 3D spin) ─── */
+/* ─── Caduceus: Flaticon mask, primary green, 3D spin on tilted local Y ─── */
 
 .caduceus-mark {
   display: flex;
@@ -207,6 +207,10 @@
   align-items: center;
   justify-content: center;
   transform-style: preserve-3d;
+<<<<<<< HEAD
+=======
+  /* Local Y (vertical in the asset) ~50° down and toward the lower-right; +Z = clockwise = tilt to the right */
+>>>>>>> origin/experimental
   transform: rotateX(50deg) rotateZ(50deg);
 }
 
@@ -217,6 +221,7 @@
   animation: caduceusSpinOnY 16s linear infinite;
 }
 
+/* PNG alpha as mask so fill matches primary green */
 .caduceus-mark__silhouette {
   width: 100%;
   height: 100%;
@@ -1201,14 +1206,25 @@
   margin-bottom: 1rem;
 }
 
+.savings-strip__label,
+.savings-strip__value,
+.savings-strip__sep {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .savings-strip__label {
-  font-size: 0.65rem;
   font-weight: 500;
   color: var(--clr-text-muted);
 }
 
+.savings-strip__sep {
+  font-weight: 500;
+  color: var(--clr-text-muted);
+  user-select: none;
+}
+
 .savings-strip__value {
-  font-size: 1rem;
   font-weight: 600;
   color: var(--clr-primary);
 }

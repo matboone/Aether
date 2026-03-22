@@ -7,7 +7,7 @@ interface CaduceusMarkProps {
 
 /**
  * Flaticon ID 12481775 (`/icons/caduceus-12481775.png`); Settings + `public/icons/ATTRIBUTION.txt`.
- * Primary green via CSS mask; spins on local Y after axis tilt.
+ * Primary green via CSS mask; spins on local Y after axis tilt (down toward the lower-right).
  */
 export function CaduceusMark({ size = 48, className }: CaduceusMarkProps) {
   const s = size;
