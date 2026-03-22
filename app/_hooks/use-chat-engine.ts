@@ -48,6 +48,9 @@ export interface ChatEngine {
   profile: ProfileInfo;
   rightPanelModules: ModuleType[];
   minimizedModules: Set<ModuleType>;
+  moduleRevealMessageId: string | null;
+  moduleRevealCount: number;
+  loadingStepNumber: number | null;
   toggleMinimize: (m: ModuleType) => void;
 
   threadRef: React.RefObject<HTMLDivElement | null>;
@@ -87,6 +90,8 @@ const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
   "line-items",
   "eligibility",
 ]);
+
+const MODULE_REVEAL_INTERVAL_MS = 1200;
 
 function formatCurrency(value: number | null | undefined): string | null {
   if (value === null || value === undefined || Number.isNaN(value)) return null;
@@ -422,12 +427,16 @@ export function useChatEngine(): ChatEngine {
   const [uploadSizeLabel, setUploadSizeLabel] = useState<string | null>(null);
   const [rightPanelMods, setRightPanelMods] = useState<ModuleType[]>([]);
   const [minimizedModules, setMinimizedModules] = useState<Set<ModuleType>>(new Set());
+  const [moduleRevealMessageId, setModuleRevealMessageId] = useState<string | null>(null);
+  const [moduleRevealCount, setModuleRevealCount] = useState(0);
+  const [loadingStepNumber, setLoadingStepNumber] = useState<number | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const factsRef = useRef<SessionFacts>(facts);
   const sessionIdRef = useRef<string | null>(sessionId);
   const manuallyExpandedModulesRef = useRef<Set<ModuleType>>(new Set());
+  const revealTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
     factsRef.current = facts;
@@ -573,6 +582,13 @@ export function useChatEngine(): ChatEngine {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
+  const clearRevealTimers = useCallback(() => {
+    for (const timerId of revealTimersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    revealTimersRef.current = [];
+  }, []);
+
   const sendChat = useCallback(
     async (
       content: string,
@@ -604,14 +620,42 @@ export function useChatEngine(): ChatEngine {
       const data = (await response.json()) as ChatMessageResponseDto;
       applyServerState(data.step, data.facts, data.ui, data.sessionId);
 
+      const modules = nextModules(data.step, data.ui, data.facts);
+      const inlineModules = modules.filter((m) => !RIGHT_PANEL_MODULE_TYPES.has(m));
+      const aiMessageId = `ai-${Date.now()}`;
+
+      clearRevealTimers();
+      if (inlineModules.length > 0) {
+        setModuleRevealMessageId(aiMessageId);
+        setModuleRevealCount(1);
+        setLoadingStepNumber(2);
+
+        for (let i = 2; i <= inlineModules.length; i += 1) {
+          const timerId = window.setTimeout(() => {
+            setModuleRevealCount(i);
+            setLoadingStepNumber(Math.min(9, i + 1));
+          }, MODULE_REVEAL_INTERVAL_MS * (i - 1));
+          revealTimersRef.current.push(timerId);
+        }
+
+        const doneTimer = window.setTimeout(() => {
+          setLoadingStepNumber(null);
+        }, MODULE_REVEAL_INTERVAL_MS * Math.max(inlineModules.length, 1));
+        revealTimersRef.current.push(doneTimer);
+      } else {
+        setModuleRevealMessageId(null);
+        setModuleRevealCount(0);
+        setLoadingStepNumber(null);
+      }
+
       addMessage({
-        id: `ai-${Date.now()}`,
+        id: aiMessageId,
         sender: "ai",
         text: data.assistantMessage,
-        modules: nextModules(data.step, data.ui, data.facts),
+        modules,
       });
     },
-    [addMessage, applyServerState, ensureSession],
+    [addMessage, applyServerState, clearRevealTimers, ensureSession],
   );
 
   const handleSend = useCallback(
@@ -774,6 +818,10 @@ export function useChatEngine(): ChatEngine {
     setUploadSizeLabel(null);
     setRightPanelMods([]);
     setMinimizedModules(new Set());
+    setModuleRevealMessageId(null);
+    setModuleRevealCount(0);
+    setLoadingStepNumber(null);
+    clearRevealTimers();
     manuallyExpandedModulesRef.current = new Set();
 
     const run = async () => {
@@ -790,7 +838,7 @@ export function useChatEngine(): ChatEngine {
     };
 
     void run();
-  }, [addMessage, applyServerState, createSession]);
+  }, [addMessage, applyServerState, clearRevealTimers, createSession]);
 
   const handleChipClick = useCallback(
     (text: string) => {
@@ -896,6 +944,9 @@ export function useChatEngine(): ChatEngine {
     },
     rightPanelModules: rightPanelMods,
     minimizedModules,
+    moduleRevealMessageId,
+    moduleRevealCount,
+    loadingStepNumber,
     toggleMinimize,
     threadRef,
     textareaRef,

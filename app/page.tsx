@@ -121,7 +121,9 @@ export default function AetherDashboard() {
                 <ArrowLeft size={18} />
               </button>
               <span key={engine.stage} className="aether-chat__breadcrumb">
-                {STAGE_LABELS[engine.stage]}
+                {engine.loadingStepNumber !== null
+                  ? `STEP ${engine.loadingStepNumber}: LOADING`
+                  : STAGE_LABELS[engine.stage]}
               </span>
 
               {showRightPanel && (

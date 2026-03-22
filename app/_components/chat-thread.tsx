@@ -45,7 +45,11 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
   return (
     <div className="aether-chat__thread" ref={threadRef}>
       {messages.map((msg) => {
-        const modulesForMsg = allowedModulesPerMsg.get(msg.id) ?? [];
+        const allModulesForMsg = allowedModulesPerMsg.get(msg.id) ?? [];
+        const modulesForMsg =
+          msg.id === engine.moduleRevealMessageId
+            ? allModulesForMsg.slice(0, Math.max(0, engine.moduleRevealCount))
+            : allModulesForMsg;
         return (
           <div key={msg.id} className={`msg-wrapper msg-wrapper--${msg.sender}`}>
             {msg.sender === "ai" && <div className="msg-avatar">A</div>}
