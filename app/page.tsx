@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
 import { STAGE_LABELS } from "./_constants/dashboard";
@@ -13,8 +13,15 @@ import { ModuleRenderer } from "./_components/modules/module-renderer";
 import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
+import type { ModuleType, SessionFacts } from "./_types/dashboard";
 
 type RightTab = "info" | "strategy";
+
+const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
+  "action-plan",
+  "doc-chips",
+  "phone-script",
+]);
 
 export default function AetherDashboard() {
   const engine = useChatEngine();
@@ -33,6 +40,34 @@ export default function AetherDashboard() {
 
   const hasStrategy = engine.rightPanelModules.length > 0;
   const showRightPanel = hasFacts || hasStrategy;
+
+  const revealedInlineModules = useMemo<ModuleType[]>(() => {
+    if (!engine.moduleRevealMessageId) return [];
+    const msg = engine.messages.find((m) => m.id === engine.moduleRevealMessageId);
+    if (!msg?.modules?.length) return [];
+    return msg.modules
+      .filter((m): m is ModuleType => !RIGHT_PANEL_MODULES.has(m))
+      .slice(0, Math.max(0, engine.moduleRevealCount));
+  }, [engine.messages, engine.moduleRevealCount, engine.moduleRevealMessageId]);
+
+  const factsForPanel = useMemo<SessionFacts>(() => {
+    const visible = new Set<ModuleType>(revealedInlineModules);
+    const billVisible = visible.has("bill-summary") || visible.has("line-items") || visible.has("upload");
+    const eligibilityVisible = visible.has("eligibility") || visible.has("income-selector");
+    const resolutionVisible = visible.has("resolution");
+
+    return {
+      ...engine.facts,
+      estimatedBillTotal: billVisible ? engine.facts.estimatedBillTotal : null,
+      uploadedBillId: billVisible ? engine.facts.uploadedBillId : null,
+      parsedBillId: billVisible ? engine.facts.parsedBillId : null,
+      analysisId: billVisible ? engine.facts.analysisId : null,
+      incomeBracket: eligibilityVisible ? engine.facts.incomeBracket : null,
+      householdSize: eligibilityVisible ? engine.facts.householdSize : null,
+      assistanceEligible: eligibilityVisible ? engine.facts.assistanceEligible : null,
+      negotiationOutcome: resolutionVisible ? engine.facts.negotiationOutcome : null,
+    };
+  }, [engine.facts, revealedInlineModules]);
 
   /* Auto-switch to strategy tab when strategy content appears */
   useEffect(() => {
@@ -186,7 +221,7 @@ export default function AetherDashboard() {
             <div className="right-panel__content">
               {rightTab === "info" && (
                 <SessionFactsPanel
-                  facts={engine.facts}
+                  facts={factsForPanel}
                   flashFields={engine.flashFields}
                   summaryExpanded={engine.summaryExpanded}
                   openSections={engine.openSections}
