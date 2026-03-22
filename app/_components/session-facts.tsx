@@ -284,7 +284,7 @@ export function SessionFactsPanel({
             </>
           ) : (
             <span className="fact-kv__empty" style={{ fontSize: "0.7rem" }}>
-              Not yet resolved
+              Not yet recorded
             </span>
           )}
         </FactCard>

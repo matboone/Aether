@@ -11,6 +11,7 @@ import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { useTheme } from "./_hooks/use-theme";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
+import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
 import { ChatHistoryRail } from "./_components/chat-history-rail";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
@@ -34,18 +35,6 @@ export default function AetherDashboard() {
   const [panelPrimed, setPanelPrimed] = useState(false);
   const autoOpenTriggeredRef = useRef(false);
 
-  const eligibilityCompleted =
-    engine.facts.assistanceEligible === "likely" ||
-    engine.facts.assistanceEligible === "unlikely";
-
-  const strategyModules = useMemo(
-    () =>
-      engine.rightPanelModules.filter((m) =>
-        eligibilityCompleted ? true : m !== "action-plan" && m !== "phone-script",
-      ),
-    [eligibilityCompleted, engine.rightPanelModules],
-  );
-
   const revealedInlineModules = useMemo<ModuleType[]>(() => {
     if (!engine.moduleRevealMessageId) return [];
     const msg = engine.messages.find((m) => m.id === engine.moduleRevealMessageId);
@@ -59,7 +48,6 @@ export default function AetherDashboard() {
     const visible = new Set<ModuleType>(revealedInlineModules);
     const billVisible = visible.has("bill-summary") || visible.has("line-items") || visible.has("upload");
     const eligibilityVisible = visible.has("eligibility") || visible.has("income-selector");
-    const resolutionVisible = visible.has("resolution");
 
     return {
       ...engine.facts,
@@ -70,7 +58,6 @@ export default function AetherDashboard() {
       incomeBracket: eligibilityVisible ? engine.facts.incomeBracket : null,
       householdSize: eligibilityVisible ? engine.facts.householdSize : null,
       assistanceEligible: eligibilityVisible ? engine.facts.assistanceEligible : null,
-      negotiationOutcome: resolutionVisible ? engine.facts.negotiationOutcome : null,
     };
   }, [engine.facts, revealedInlineModules]);
 
@@ -285,9 +272,20 @@ export default function AetherDashboard() {
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
-                  {strategyModules.map((m, idx) => (
-                    <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
-                  ))}
+                  <StrategyChecklistPlaceholder
+                    isLoading={engine.isTyping || engine.isUploading}
+                    facts={engine.facts}
+                    hasNegotiationPlan={Boolean(engine.backendUi?.negotiationPlan)}
+                    hasPhoneScript={Boolean(
+                      engine.backendUi?.negotiationPlan?.phoneScript &&
+                        engine.backendUi.negotiationPlan.phoneScript.length > 0,
+                    )}
+                  />
+                  {engine.rightPanelModules
+                    .filter((m) => m !== "action-plan")
+                    .map((m, idx) => (
+                      <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
+                    ))}
                 </div>
               )}
             </div>

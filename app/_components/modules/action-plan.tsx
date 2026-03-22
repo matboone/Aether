@@ -11,6 +11,9 @@ export function ActionPlan({ nextActions }: ActionPlanProps) {
         <div className="action-plan__title">Your Action Plan</div>
         <div className="action-plan__sub">Recommended steps in order</div>
       </div>
+      {nextActions.length === 0 ? (
+        <p className="action-plan__empty">Steps will show up here as your plan takes shape.</p>
+      ) : (
       <div className="stepper-list">
         {nextActions.map((step, i) => {
           const status = i === 0 ? "active" : "pending";
@@ -42,6 +45,7 @@ export function ActionPlan({ nextActions }: ActionPlanProps) {
           );
         })}
       </div>
+      )}
     </>
   );
 }

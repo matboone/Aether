@@ -16,12 +16,16 @@ export function PhoneScript({ hospitalName, lines }: PhoneScriptProps) {
         </div>
       </div>
       <div className="phone-script__body">
-        {lines.map((line, idx) => (
-          <div key={`${line}-${idx}`} className="script-section">
-            <div className="script-section__label">Section {idx + 1}</div>
-            <div className="script-section__text">{line}</div>
-          </div>
-        ))}
+        {lines.length === 0 ? (
+          <p className="phone-script__empty">Your call script will appear when the action plan is ready.</p>
+        ) : (
+          lines.map((line, idx) => (
+            <div key={`${line}-${idx}`} className="script-section">
+              <div className="script-section__label">Section {idx + 1}</div>
+              <div className="script-section__text">{line}</div>
+            </div>
+          ))
+        )}
       </div>
     </>
   );

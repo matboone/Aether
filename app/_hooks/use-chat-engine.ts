@@ -106,6 +106,9 @@ const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
   "eligibility",
 ]);
 
+/** Strategy tab: ensure phone script slot early; action plan stays out of this panel (checklist covers progress). */
+const STRATEGY_TAB_MODULES_ORDER: ModuleType[] = ["phone-script"];
+
 const MODULE_REVEAL_INTERVAL_MS = 1200;
 
 function formatCurrency(value: number | null | undefined): string | null {
@@ -999,6 +1002,14 @@ export function useChatEngine(): ChatEngine {
     return () => clearInterval(interval);
   }, [sessionId, stage, applyServerState, ACTIVE_POLL_STEPS]);
 
+  const rightPanelModules = useMemo(() => {
+    if (!hasStarted) return rightPanelMods;
+    if (stage === "RESOLVED") return rightPanelMods;
+    const merged = new Set(rightPanelMods);
+    for (const m of STRATEGY_TAB_MODULES_ORDER) merged.add(m);
+    return STRATEGY_TAB_MODULES_ORDER.filter((m) => merged.has(m));
+  }, [rightPanelMods, hasStarted, stage]);
+
   return {
     stage,
     messages,
@@ -1028,7 +1039,7 @@ export function useChatEngine(): ChatEngine {
       accountName: shortAccount(sessionId),
       status: stage.replaceAll("_", " "),
     },
-    rightPanelModules: rightPanelMods,
+    rightPanelModules,
     minimizedModules,
     moduleRevealMessageId,
     moduleRevealCount,
