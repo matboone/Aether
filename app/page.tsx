@@ -11,7 +11,7 @@ import { SessionFactsPanel } from "./_components/session-facts";
 import { SettingsDialog } from "./_components/settings-dialog";
 import { useTheme } from "./_hooks/use-theme";
 import { ModuleRenderer } from "./_components/modules/module-renderer";
-import { StrategyChecklistPlaceholder } from "./_components/modules/strategy-checklist-placeholder";
+import { ChatHistoryRail } from "./_components/chat-history-rail";
 import { ArrowLeft, FileText, Lightbulb, Phone, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { CaduceusIcon } from "./_components/caduceus-icon";
 import type { ModuleType, SessionFacts } from "./_types/dashboard";
@@ -107,7 +107,11 @@ export default function AetherDashboard() {
   }, [engine.uploaded, engine.facts.uploadedBillId, panelPrimed]);
 
   return (
-    <div className="aether-dashboard">
+    <div
+      className={`aether-dashboard${
+        !showWelcome && panelOpen ? " aether-dashboard--panel-open" : ""
+      }`}
+    >
       {/* ─── Left Sidebar ─── */}
       <Sidebar
         activeNav={engine.activeNav}
@@ -116,6 +120,20 @@ export default function AetherDashboard() {
         profileName={engine.profile.accountName}
         profileStatus={engine.profile.status}
       />
+
+      <div
+        className={`chat-history-rail-outer${
+          engine.activeNav === 1 ? "" : " chat-history-rail-outer--hidden"
+        }`}
+        aria-hidden={engine.activeNav !== 1}
+      >
+        <ChatHistoryRail
+          nodes={engine.chatNodes}
+          activeSessionId={engine.sessionId}
+          isLoading={engine.isLoadingChatSession}
+          onSelectSession={engine.loadChatSession}
+        />
+      </div>
 
       {/* ─── Chat Panel ─── */}
       <main className={`aether-chat ${showWelcome ? "aether-chat--welcome" : ""}`}>
@@ -267,15 +285,6 @@ export default function AetherDashboard() {
 
               {rightTab === "strategy" && (
                 <div className="right-panel__strategy-body">
-                  <StrategyChecklistPlaceholder
-                    isLoading={engine.isTyping || engine.isUploading}
-                    facts={engine.facts}
-                    hasNegotiationPlan={Boolean(engine.backendUi?.negotiationPlan)}
-                    hasPhoneScript={Boolean(
-                      engine.backendUi?.negotiationPlan?.phoneScript &&
-                        engine.backendUi.negotiationPlan.phoneScript.length > 0,
-                    )}
-                  />
                   {strategyModules.map((m, idx) => (
                     <ModuleRenderer key={m} moduleType={m} idx={idx} engine={engine} bare />
                   ))}

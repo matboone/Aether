@@ -13,14 +13,20 @@ import type {
   SessionStep,
 } from "@/src/types/domain";
 import type { Stage, Message, ModuleType, SessionFacts } from "@/app/_types/dashboard";
-import { EMPTY_FACTS, SUGGESTION_CHIPS } from "@/app/_constants/dashboard";
-
-/** Server stores normalized brackets; income pills use INCOME_OPTIONS labels */
-const SERVER_INCOME_BRACKET_TO_UI_LABEL: Record<string, string> = {
-  "0_50k": "$40k\u2013$60k",
-  "50k_80k": "$60k\u2013$80k",
-  "80k_plus": "$80k+",
-};
+import {
+  EMPTY_FACTS,
+  INCOME_BRACKET_SERVER_TO_LABEL,
+  SUGGESTION_CHIPS,
+  formatIncomeBracketLabel,
+} from "@/app/_constants/dashboard";
+import type { GetSessionResponseDto } from "@/src/types/dto";
+import { deriveSessionBillTitle } from "@/app/_lib/derive-session-bill-title";
+import { loadChatNodes, upsertChatNode, type ChatHistoryNode } from "@/app/_lib/chat-history-storage";
+import {
+  nextModules,
+  rightPanelModulesFromUi,
+  RIGHT_PANEL_MODULE_TYPES,
+} from "@/app/_lib/session-modules";
 
 /** Pill label → API bracket (must stay in sync with app/_constants/dashboard INCOME_OPTIONS) */
 const UI_LABEL_TO_SERVER_BRACKET: Record<string, string> = {
@@ -88,18 +94,11 @@ export interface ChatEngine {
   setActiveNav: (v: number) => void;
   setOpenSections: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setTechIdsOpen: (v: boolean) => void;
-}
 
-const MODULE_ORDER: ModuleType[] = [
-  "upload",
-  "bill-summary",
-  "line-items",
-  "income-selector",
-  "eligibility",
-  "action-plan",
-  "phone-script",
-  "resolution",
-];
+  chatNodes: ChatHistoryNode[];
+  loadChatSession: (sessionId: string) => Promise<void>;
+  isLoadingChatSession: boolean;
+}
 
 const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
   "bill-summary",
@@ -174,7 +173,7 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: Renderab
     uploadedBillId: facts.uploadedBillId ?? null,
     parsedBillId: facts.parsedBillId ?? null,
     analysisId: facts.analysisId ?? null,
-    incomeBracket: facts.incomeBracket ?? null,
+    incomeBracket: formatIncomeBracketLabel(facts.incomeBracket),
     householdSize: facts.householdSize ?? null,
     assistanceEligible,
     negotiationOutcome:
@@ -189,51 +188,27 @@ function mapDomainFactsToDashboardFacts(facts: DomainSessionFacts, ui?: Renderab
   };
 }
 
-/* Modules that belong in the right strategy panel instead of inline in chat */
-const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
-  "action-plan",
-  "phone-script",
-]);
-
-function nextModules(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
-  const set = new Set<ModuleType>();
-  const strategyStillActive =
-    step !== "RESOLUTION_RECORDED" && step !== "COMPLETE";
-
-  if (ui.canUploadBill) set.add("upload");
-  if (ui.analysisSummary) {
-    set.add("bill-summary");
-    if ((ui.flaggedItems?.length ?? 0) > 0) {
-      set.add("line-items");
+function mapServerRowsToMessages(
+  rows: Array<{ id: string; role: string; content: string }>,
+  step: SessionStep,
+  ui: RenderableSessionUi,
+  facts: DomainSessionFacts,
+): Message[] {
+  const chat: Message[] = [];
+  for (const row of rows) {
+    if (row.role === "system") continue;
+    const sender = row.role === "assistant" ? "ai" : "user";
+    chat.push({ id: row.id, sender, text: row.content });
+  }
+  const inlineMods = nextModules(step, ui, facts).filter((m) => !RIGHT_PANEL_MODULE_TYPES.has(m));
+  if (inlineMods.length === 0) return chat;
+  for (let i = chat.length - 1; i >= 0; i -= 1) {
+    if (chat[i].sender === "ai") {
+      chat[i] = { ...chat[i], modules: inlineMods };
+      break;
     }
   }
-  /* Show during bill analysis too — otherwise the UI asks for income before step advances */
-  const awaitingIncomeChoice =
-    !facts.incomeBracket &&
-    (step === "AWAITING_INCOME" || step === "BILL_ANALYZED");
-  if (awaitingIncomeChoice) {
-    set.add("income-selector");
-  }
-  if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
-    set.add("eligibility");
-  }
-  if (ui.negotiationPlan && strategyStillActive) {
-    set.add("action-plan");
-    set.add("phone-script");
-    if (ui.negotiationPlan.assistanceAssessment) {
-      set.add("eligibility");
-    }
-  }
-  /* Resolution only once session is truly complete */
-  if (ui.resolutionSummary && (step === "RESOLUTION_RECORDED" || step === "COMPLETE")) {
-    set.add("resolution");
-  }
-
-  return MODULE_ORDER.filter((moduleType) => set.has(moduleType));
-}
-
-function rightPanelModulesFromUi(step: SessionStep, ui: RenderableSessionUi, facts: DomainSessionFacts): ModuleType[] {
-  return nextModules(step, ui, facts).filter((m) => RIGHT_PANEL_MODULE_TYPES.has(m));
+  return chat;
 }
 
 function formatFileSize(bytes: number): string {
@@ -424,11 +399,15 @@ export function useChatEngine(): ChatEngine {
   const [moduleRevealMessageId, setModuleRevealMessageId] = useState<string | null>(null);
   const [moduleRevealCount, setModuleRevealCount] = useState(0);
   const [loadingStepNumber, setLoadingStepNumber] = useState<number | null>(null);
+  const [chatNodes, setChatNodes] = useState<ChatHistoryNode[]>([]);
+  const [isLoadingChatSession, setIsLoadingChatSession] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const factsRef = useRef<SessionFacts>(facts);
   const sessionIdRef = useRef<string | null>(sessionId);
+  const backendUiRef = useRef<RenderableSessionUi | null>(null);
+  const uploadFilenameRef = useRef<string | null>(null);
   const manuallyExpandedModulesRef = useRef<Set<ModuleType>>(new Set());
   const revealTimersRef = useRef<number[]>([]);
 
@@ -439,6 +418,18 @@ export function useChatEngine(): ChatEngine {
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  useEffect(() => {
+    backendUiRef.current = backendUi;
+  }, [backendUi]);
+
+  useEffect(() => {
+    uploadFilenameRef.current = uploadFilename;
+  }, [uploadFilename]);
+
+  useEffect(() => {
+    setChatNodes(loadChatNodes());
+  }, []);
 
   const flashFact = useCallback((field: string) => {
     setFlashFields((prev) => new Set(prev).add(field));
@@ -494,7 +485,7 @@ export function useChatEngine(): ChatEngine {
 
       if (domainFacts.incomeBracket) {
         const raw = domainFacts.incomeBracket;
-        setSelectedIncome(SERVER_INCOME_BRACKET_TO_UI_LABEL[raw] ?? raw);
+        setSelectedIncome(INCOME_BRACKET_SERVER_TO_LABEL[raw] ?? raw);
         setIncomeConfirmed(true);
       }
     },
@@ -803,7 +794,87 @@ export function useChatEngine(): ChatEngine {
     void run();
   }, [addMessage, householdSize, selectedIncome, sendChat]);
 
+  const loadChatSession = useCallback(
+    async (targetId: string) => {
+      if (!targetId || targetId === sessionIdRef.current) return;
+      setIsLoadingChatSession(true);
+      clearRevealTimers();
+      try {
+        const [sessResp, msgResp] = await Promise.all([
+          fetch(`/api/sessions/${targetId}`),
+          fetch(`/api/sessions/${targetId}/messages`),
+        ]);
+        if (!sessResp.ok) throw new Error("session");
+        const data = (await sessResp.json()) as GetSessionResponseDto;
+        let rows: Array<{ id: string; role: string; content: string }> = [];
+        if (msgResp.ok) {
+          const msgData = (await msgResp.json()) as {
+            messages?: Array<{ id: string; role: string; content: string }>;
+          };
+          rows = msgData.messages ?? [];
+        }
+        const hydrated = mapServerRowsToMessages(rows, data.step, data.ui, data.facts);
+        const inlineMods = nextModules(data.step, data.ui, data.facts).filter(
+          (m) => !RIGHT_PANEL_MODULE_TYPES.has(m),
+        );
+        let lastAiId: string | null = null;
+        for (let i = hydrated.length - 1; i >= 0; i -= 1) {
+          if (hydrated[i].sender === "ai") {
+            lastAiId = hydrated[i].id;
+            break;
+          }
+        }
+
+        if (!data.facts.incomeBracket) {
+          setSelectedIncome(null);
+          setIncomeConfirmed(false);
+        }
+        setHouseholdSize(data.facts.householdSize ?? 1);
+
+        applyServerState(data.step, data.facts, data.ui, data.sessionId);
+        setMessages(hydrated);
+        setHasStarted(true);
+        setModuleRevealMessageId(lastAiId);
+        setModuleRevealCount(inlineMods.length);
+        setLoadingStepNumber(null);
+        setInputValue("");
+        setIsTyping(false);
+        setIsUploading(false);
+        manuallyExpandedModulesRef.current = new Set();
+
+        const dashboardFacts = mapDomainFactsToDashboardFacts(data.facts, data.ui);
+        const title = deriveSessionBillTitle({
+          facts: dashboardFacts,
+          backendUi: data.ui,
+          uploadFilename: null,
+          hasStarted: true,
+        });
+        setChatNodes(upsertChatNode({ sessionId: data.sessionId, title, updatedAt: Date.now() }));
+      } catch {
+        addMessage({
+          id: `ai-load-${Date.now()}`,
+          sender: "ai",
+          text: "Couldn’t load that conversation. It may have been removed or the server is unreachable.",
+        });
+      } finally {
+        setIsLoadingChatSession(false);
+      }
+    },
+    [addMessage, applyServerState, clearRevealTimers],
+  );
+
   const clearSession = useCallback(() => {
+    const sid = sessionIdRef.current;
+    if (sid && hasStarted) {
+      const title = deriveSessionBillTitle({
+        facts: factsRef.current,
+        backendUi: backendUiRef.current,
+        uploadFilename: uploadFilenameRef.current,
+        hasStarted: true,
+      });
+      setChatNodes(upsertChatNode({ sessionId: sid, title, updatedAt: Date.now() }));
+    }
+
     setStage("INTRO");
     setMessages([]);
     setFacts({ ...EMPTY_FACTS });
@@ -846,7 +917,7 @@ export function useChatEngine(): ChatEngine {
     };
 
     void run();
-  }, [addMessage, applyServerState, clearRevealTimers, createSession]);
+  }, [addMessage, applyServerState, clearRevealTimers, createSession, hasStarted]);
 
   const handleChipClick = useCallback(
     (text: string) => {
@@ -980,5 +1051,8 @@ export function useChatEngine(): ChatEngine {
     setActiveNav,
     setOpenSections,
     setTechIdsOpen,
+    chatNodes,
+    loadChatSession,
+    isLoadingChatSession,
   };
 }

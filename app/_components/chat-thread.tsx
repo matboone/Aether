@@ -142,7 +142,11 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
         });
         const hasText = msg.text.trim().length > 0;
         return (
-          <div key={msg.id} className={`msg-wrapper msg-wrapper--${msg.sender}`}>
+          <div
+            key={msg.id}
+            id={`aether-msg-${msg.id}`}
+            className={`msg-wrapper msg-wrapper--${msg.sender}`}
+          >
             {msg.sender === "ai" && <div className="msg-avatar">A</div>}
             <div>
               {hasText && !delayBracketBubble && (

@@ -287,9 +287,12 @@ function ModuleStatusBadge({ status }: { readonly status: ModuleStatus }) {
   }
   if (status === "blocked") {
     return (
-      <span className="module-status-badge module-status-badge--blocked">
+      <span
+        className="module-status-badge module-status-badge--blocked module-status-badge--icon-only"
+        title="Ineligible"
+        aria-label="Ineligible"
+      >
         <CircleX size={12} />
-        X
       </span>
     );
   }
