@@ -12,6 +12,12 @@ const RIGHT_PANEL_MODULES: Set<ModuleType> = new Set([
   "phone-script",
 ]);
 
+/* Sticky inline modules should keep their first owner message to avoid remount/regeneration */
+const STICKY_INLINE_MODULES: Set<ModuleType> = new Set([
+  "bill-summary",
+  "line-items",
+]);
+
 interface ChatThreadProps {
   readonly messages: Message[];
   readonly isTyping: boolean;
@@ -26,16 +32,19 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
    * upload prompts, etc.
    */
   const allowedModulesPerMsg = useMemo(() => {
-    const lastOwner = new Map<ModuleType, string>();
+    const owner = new Map<ModuleType, string>();
     for (const msg of messages) {
       for (const m of msg.modules ?? []) {
-        lastOwner.set(m, msg.id);
+        if (STICKY_INLINE_MODULES.has(m) && owner.has(m)) {
+          continue;
+        }
+        owner.set(m, msg.id);
       }
     }
     const result = new Map<string, ModuleType[]>();
     for (const msg of messages) {
       const kept = (msg.modules ?? []).filter(
-        (m) => lastOwner.get(m) === msg.id && !RIGHT_PANEL_MODULES.has(m),
+        (m) => owner.get(m) === msg.id && !RIGHT_PANEL_MODULES.has(m),
       );
       if (kept.length > 0) result.set(msg.id, kept);
     }
