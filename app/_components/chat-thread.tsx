@@ -59,22 +59,37 @@ export function ChatThread({ messages, isTyping, threadRef, engine }: ChatThread
           msg.id === engine.moduleRevealMessageId
             ? allModulesForMsg.slice(0, Math.max(0, engine.moduleRevealCount))
             : allModulesForMsg;
+        const showModulesBeforeMessage =
+          msg.sender === "ai" &&
+          modulesForMsg.includes("eligibility") &&
+          /based on this bracket/i.test(msg.text);
         return (
           <div key={msg.id} className={`msg-wrapper msg-wrapper--${msg.sender}`}>
             {msg.sender === "ai" && <div className="msg-avatar">A</div>}
             <div>
+              {showModulesBeforeMessage &&
+                modulesForMsg.map((m, idx) => (
+                  <ModuleRenderer
+                    key={m}
+                    moduleType={m}
+                    idx={idx}
+                    engine={engine}
+                  />
+                ))}
+
               <div className={`msg-bubble msg-bubble--${msg.sender}`}>
                 {msg.sender === "ai" && <div className="msg-sender">Aether</div>}
                 <div className="msg-text">{msg.text}</div>
               </div>
-              {modulesForMsg.map((m, idx) => (
-                <ModuleRenderer
-                  key={m}
-                  moduleType={m}
-                  idx={idx}
-                  engine={engine}
-                />
-              ))}
+              {!showModulesBeforeMessage &&
+                modulesForMsg.map((m, idx) => (
+                  <ModuleRenderer
+                    key={m}
+                    moduleType={m}
+                    idx={idx}
+                    engine={engine}
+                  />
+                ))}
             </div>
           </div>
         );
