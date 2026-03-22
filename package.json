@@ -19,6 +19,7 @@
     "ai": "^6.0.134",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.577.0",
     "mongoose": "^9.3.1",
     "next": "16.2.1",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@catppuccin/tailwindcss": "^1.0.0",
     "@tailwindcss/postcss": "^4",
+    "@types/jspdf": "^1.3.3",
     "@types/mongoose": "^5.11.97",
     "@types/node": "^20",
     "@types/react": "^19",

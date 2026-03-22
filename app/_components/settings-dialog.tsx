@@ -1,7 +1,15 @@
 "use client";
 
-import { X, Moon, Sun, Bell, BellOff, Volume2, VolumeX, Shield } from "lucide-react";
-import { useState } from "react";
+import { X, Moon, Sun, Gauge, PanelRightOpen, Rows3, Rabbit, RefreshCcw } from "lucide-react";
+import { useEffect } from "react";
+
+interface DashboardPreferences {
+  readonly compactDensity: boolean;
+  readonly reduceMotion: boolean;
+  readonly autoOpenPanel: boolean;
+  readonly fastModuleReveal: boolean;
+  readonly rememberRightTab: boolean;
+}
 
 interface SettingsDialogProps {
   readonly open: boolean;
@@ -13,6 +21,11 @@ interface SettingsDialogProps {
   };
   readonly isDark: boolean;
   readonly onToggleDark: () => void;
+  readonly preferences: DashboardPreferences;
+  readonly onSetPreference: <K extends keyof DashboardPreferences>(
+    key: K,
+    value: DashboardPreferences[K],
+  ) => void;
 }
 
 function ToggleSwitch({
@@ -35,30 +48,33 @@ function ToggleSwitch({
   );
 }
 
-export function SettingsDialog({ open, onClose, profile, isDark, onToggleDark }: SettingsDialogProps) {
-  const [notifications, setNotifications] = useState(true);
-  const [soundEffects, setSoundEffects] = useState(true);
-  const [dataSharing, setDataSharing] = useState(false);
+export function SettingsDialog({
+  open,
+  onClose,
+  profile,
+  isDark,
+  onToggleDark,
+  preferences,
+  onSetPreference,
+}: SettingsDialogProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    globalThis.addEventListener("keydown", onKeyDown);
+    return () => {
+      globalThis.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, open]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="settings-overlay"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-      role="button"
-      tabIndex={0}
-    >
-      <div
-        className="settings-dialog"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
+    <div className="settings-overlay">
+      <dialog className="settings-dialog" open>
         {/* Header */}
         <div className="settings-dialog__header">
           <h2 className="settings-dialog__title">Settings</h2>
@@ -97,34 +113,73 @@ export function SettingsDialog({ open, onClose, profile, isDark, onToggleDark }:
             </div>
           </div>
 
-          {/* Notifications */}
+          {/* Experience */}
           <div className="settings-section">
-            <div className="settings-section__label">Notifications</div>
+            <div className="settings-section__label">Experience</div>
             <div className="settings-row">
               <div className="settings-row__info">
-                {notifications ? <Bell size={16} /> : <BellOff size={16} />}
-                <span>Push notifications</span>
+                <PanelRightOpen size={16} />
+                <div>
+                  <span>Auto-open Session panel</span>
+                  <div className="settings-row__hint">Opens Session Info automatically after a case starts.</div>
+                </div>
               </div>
-              <ToggleSwitch checked={notifications} onChange={setNotifications} />
+              <ToggleSwitch
+                checked={preferences.autoOpenPanel}
+                onChange={(v) => onSetPreference("autoOpenPanel", v)}
+              />
             </div>
             <div className="settings-row">
               <div className="settings-row__info">
-                {soundEffects ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                <span>Sound effects</span>
+                <Rabbit size={16} />
+                <div>
+                  <span>Fast module reveal</span>
+                  <div className="settings-row__hint">Skips staged loading pauses and shows modules immediately.</div>
+                </div>
               </div>
-              <ToggleSwitch checked={soundEffects} onChange={setSoundEffects} />
+              <ToggleSwitch
+                checked={preferences.fastModuleReveal}
+                onChange={(v) => onSetPreference("fastModuleReveal", v)}
+              />
             </div>
-          </div>
-
-          {/* Privacy */}
-          <div className="settings-section">
-            <div className="settings-section__label">Privacy</div>
             <div className="settings-row">
               <div className="settings-row__info">
-                <Shield size={16} />
-                <span>Anonymous usage data</span>
+                <Rows3 size={16} />
+                <div>
+                  <span>Compact chat density</span>
+                  <div className="settings-row__hint">Tightens chat spacing so more context fits on screen.</div>
+                </div>
               </div>
-              <ToggleSwitch checked={dataSharing} onChange={setDataSharing} />
+              <ToggleSwitch
+                checked={preferences.compactDensity}
+                onChange={(v) => onSetPreference("compactDensity", v)}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <Gauge size={16} />
+                <div>
+                  <span>Reduce motion</span>
+                  <div className="settings-row__hint">Turns off most UI animations and transitions.</div>
+                </div>
+              </div>
+              <ToggleSwitch
+                checked={preferences.reduceMotion}
+                onChange={(v) => onSetPreference("reduceMotion", v)}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="settings-row__info">
+                <RefreshCcw size={16} />
+                <div>
+                  <span>Remember Strategy tab</span>
+                  <div className="settings-row__hint">Keeps your last open right-panel tab between visits.</div>
+                </div>
+              </div>
+              <ToggleSwitch
+                checked={preferences.rememberRightTab}
+                onChange={(v) => onSetPreference("rememberRightTab", v)}
+              />
             </div>
           </div>
 
@@ -155,7 +210,7 @@ export function SettingsDialog({ open, onClose, profile, isDark, onToggleDark }:
             </p>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

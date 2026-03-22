@@ -197,10 +197,10 @@ const SKELETON_MAP: Record<ModuleType, React.FC> = {
 const LOAD_DELAYS: Partial<Record<ModuleType, number>> = {
   "bill-summary": 900,
   "line-items": 1900,
-  "eligibility": 2900,
-  "action-plan": 500,
-  "doc-chips": 400,
-  "phone-script": 600,
+  "eligibility": 250,
+  "action-plan": 0,
+  "doc-chips": 0,
+  "phone-script": 0,
   "resolution": 900,
 };
 
@@ -327,17 +327,17 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
     if (loading) return;
     if (loadDelay <= 0) return;
     setCompletionFlash(true);
-    const timer = window.setTimeout(() => setCompletionFlash(false), 1000);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(() => setCompletionFlash(false), 1000);
+    return () => globalThis.clearTimeout(timer);
   }, [loadDelay, loading]);
 
   useEffect(() => {
     const prev = prevStatusRef.current;
     if (prev !== null && prev !== moduleStatus && (moduleStatus === "completed" || moduleStatus === "blocked")) {
       setCompletionFlash(true);
-      const timer = window.setTimeout(() => setCompletionFlash(false), 1000);
+      const timer = globalThis.setTimeout(() => setCompletionFlash(false), 1000);
       prevStatusRef.current = moduleStatus;
-      return () => window.clearTimeout(timer);
+      return () => globalThis.clearTimeout(timer);
     }
     prevStatusRef.current = moduleStatus;
   }, [moduleStatus]);
@@ -480,7 +480,11 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
       );
     case "doc-chips":
       return wrapCard(
-        <DocChips nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []} />,
+        <DocChips
+          nextActions={engine.backendUi?.negotiationPlan?.nextActions ?? []}
+          phoneScript={engine.backendUi?.negotiationPlan?.phoneScript ?? []}
+          hospitalName={engine.backendUi?.hospitalStrategy?.canonicalName ?? engine.facts.hospitalName ?? null}
+        />,
       );
     case "phone-script":
       return wrapCard(

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type {
   ChatMessageResponseDto,
   CreateSessionResponseDto,
+  GetSessionResponseDto,
   ProcessBillResponseDto,
   UploadBillResponseDto,
 } from "@/src/types/dto";
@@ -19,13 +20,11 @@ import {
   SUGGESTION_CHIPS,
   formatIncomeBracketLabel,
 } from "@/app/_constants/dashboard";
-import type { GetSessionResponseDto } from "@/src/types/dto";
 import { deriveSessionBillTitle } from "@/app/_lib/derive-session-bill-title";
 import { loadChatNodes, upsertChatNode, type ChatHistoryNode } from "@/app/_lib/chat-history-storage";
 import {
   nextModules,
   rightPanelModulesFromUi,
-  RIGHT_PANEL_MODULE_TYPES,
 } from "@/app/_lib/session-modules";
 
 /** Pill label → API bracket (must stay in sync with app/_constants/dashboard INCOME_OPTIONS) */
@@ -67,6 +66,10 @@ interface ProfileInfo {
   accountId: string | null;
   accountName: string;
   status: string;
+}
+
+interface ChatEngineOptions {
+  readonly fastModuleReveal?: boolean;
 }
 
 export interface ChatEngine {
@@ -135,6 +138,35 @@ const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
 const STRATEGY_TAB_MODULES_ORDER: ModuleType[] = ["phone-script"];
 
 const MODULE_REVEAL_INTERVAL_MS = 1200;
+const MODULE_REVEAL_DELAY_BY_TYPE: Partial<Record<ModuleType, number>> = {
+  "bill-summary": 900,
+  "line-items": 1900,
+  "income-selector": 700,
+  "eligibility": 3200,
+  "resolution": 900,
+};
+const MODULE_REVEAL_PAUSE_MS = 220;
+const MODULE_REVEAL_EXTRA_PAUSE_AFTER: Partial<Record<ModuleType, number>> = {
+  "eligibility": 900,
+};
+
+function normalizeMessageText(text: string): string {
+  return text.trim().replaceAll(/\s+/g, " ").toLowerCase();
+}
+
+function sameModuleList(a?: ModuleType[], b?: ModuleType[]): boolean {
+  const aList = a ?? [];
+  const bList = b ?? [];
+  if (aList.length !== bList.length) return false;
+  return aList.every((item, idx) => item === bList[idx]);
+}
+
+function sanitizeAssistantText(text: string): string {
+  return text.replaceAll(
+    /stay on the line until a billing review case number is provided\.?/gi,
+    "Ask for a billing review case number before ending the call.",
+  );
+}
 
 function formatCurrency(value: number | null | undefined): string | null {
   if (value === null || value === undefined || Number.isNaN(value)) return null;
@@ -228,7 +260,7 @@ function mapServerRowsToMessages(
     const sender = row.role === "assistant" ? "ai" : "user";
     chat.push({ id: row.id, sender, text: row.content });
   }
-  const inlineMods = nextModules(step, ui, facts).filter((m) => !RIGHT_PANEL_MODULE_TYPES.has(m));
+  const inlineMods = nextModules(step, ui, facts);
   if (inlineMods.length === 0) return chat;
   for (let i = chat.length - 1; i >= 0; i -= 1) {
     if (chat[i].sender === "ai") {
@@ -394,7 +426,8 @@ function deriveSuggestionChips(input: {
   return uniqueFirstThree(chips.filter((chip) => isQuestion(chip)));
 }
 
-export function useChatEngine(): ChatEngine {
+export function useChatEngine(options: ChatEngineOptions = {}): ChatEngine {
+  const fastModuleReveal = options.fastModuleReveal ?? false;
   const [stage, setStage] = useState<Stage>("INTRO");
   const [messages, setMessages] = useState<Message[]>([]);
   const [facts, setFacts] = useState<SessionFacts>({ ...EMPTY_FACTS });
@@ -437,7 +470,8 @@ export function useChatEngine(): ChatEngine {
   const backendUiRef = useRef<RenderableSessionUi | null>(null);
   const uploadFilenameRef = useRef<string | null>(null);
   const manuallyExpandedModulesRef = useRef<Set<ModuleType>>(new Set());
-  const revealTimersRef = useRef<number[]>([]);
+  const revealTimersRef = useRef<ReturnType<typeof globalThis.setTimeout>[]>([]);
+  const surfacedInlineModulesRef = useRef<Set<ModuleType>>(new Set());
 
   useEffect(() => {
     factsRef.current = facts;
@@ -514,7 +548,11 @@ export function useChatEngine(): ChatEngine {
       if (domainFacts.incomeBracket) {
         const raw = domainFacts.incomeBracket;
         setSelectedIncome(INCOME_BRACKET_SERVER_TO_LABEL[raw] ?? raw);
-        setIncomeConfirmed(true);
+        const serverIncomeConfirmed =
+          domainFacts.assistanceEligible !== null || nextStep !== "AWAITING_INCOME";
+        setIncomeConfirmed(serverIncomeConfirmed);
+      } else {
+        setIncomeConfirmed(false);
       }
     },
     [flashFact],
@@ -605,12 +643,30 @@ export function useChatEngine(): ChatEngine {
   }, [facts]);
 
   const addMessage = useCallback((msg: Message) => {
-    setMessages((prev) => [...prev, msg]);
+    setMessages((prev) => {
+      if (msg.sender !== "ai") {
+        return [...prev, msg];
+      }
+
+      const last = prev.at(-1);
+      if (last?.sender !== "ai") {
+        return [...prev, msg];
+      }
+
+      const isDuplicateText =
+        normalizeMessageText(last.text) === normalizeMessageText(msg.text);
+      const isDuplicateModules = sameModuleList(last.modules, msg.modules);
+      if (isDuplicateText && isDuplicateModules) {
+        return prev;
+      }
+
+      return [...prev, msg];
+    });
   }, []);
 
   const clearRevealTimers = useCallback(() => {
     for (const timerId of revealTimersRef.current) {
-      window.clearTimeout(timerId);
+      globalThis.clearTimeout(timerId);
     }
     revealTimersRef.current = [];
   }, []);
@@ -647,27 +703,49 @@ export function useChatEngine(): ChatEngine {
       applyServerState(data.step, data.facts, data.ui, data.sessionId);
 
       const modules = nextModules(data.step, data.ui, data.facts);
-      const inlineModules = modules.filter((m) => !RIGHT_PANEL_MODULE_TYPES.has(m));
+      const inlineModules = modules;
+      const newInlineModules = inlineModules.filter(
+        (moduleType) => !surfacedInlineModulesRef.current.has(moduleType),
+      );
+      for (const moduleType of newInlineModules) {
+        surfacedInlineModulesRef.current.add(moduleType);
+      }
       const aiMessageId = `ai-${Date.now()}`;
 
       clearRevealTimers();
-      if (inlineModules.length > 0) {
-        setModuleRevealMessageId(aiMessageId);
-        setModuleRevealCount(1);
-        setLoadingStepNumber(2);
-
-        for (let i = 2; i <= inlineModules.length; i += 1) {
-          const timerId = window.setTimeout(() => {
-            setModuleRevealCount(i);
-            setLoadingStepNumber(Math.min(9, i + 1));
-          }, MODULE_REVEAL_INTERVAL_MS * (i - 1));
-          revealTimersRef.current.push(timerId);
-        }
-
-        const doneTimer = window.setTimeout(() => {
+      if (newInlineModules.length > 0) {
+        if (fastModuleReveal) {
+          setModuleRevealMessageId(aiMessageId);
+          setModuleRevealCount(newInlineModules.length);
           setLoadingStepNumber(null);
-        }, MODULE_REVEAL_INTERVAL_MS * Math.max(inlineModules.length, 1));
-        revealTimersRef.current.push(doneTimer);
+        } else {
+          setModuleRevealMessageId(aiMessageId);
+          setModuleRevealCount(1);
+          setLoadingStepNumber(1);
+
+          let cumulativeDelayMs =
+            (MODULE_REVEAL_DELAY_BY_TYPE[newInlineModules[0]] ?? MODULE_REVEAL_INTERVAL_MS) +
+            MODULE_REVEAL_PAUSE_MS;
+
+          for (let i = 2; i <= newInlineModules.length; i += 1) {
+            const timerId = globalThis.setTimeout(() => {
+              setModuleRevealCount(i);
+              setLoadingStepNumber(i);
+            }, cumulativeDelayMs);
+            revealTimersRef.current.push(timerId);
+
+            const currentModule = newInlineModules[i - 1];
+            cumulativeDelayMs +=
+              (MODULE_REVEAL_DELAY_BY_TYPE[currentModule] ?? MODULE_REVEAL_INTERVAL_MS) +
+              MODULE_REVEAL_PAUSE_MS +
+              (MODULE_REVEAL_EXTRA_PAUSE_AFTER[currentModule] ?? 0);
+          }
+
+          const doneTimer = globalThis.setTimeout(() => {
+            setLoadingStepNumber(null);
+          }, cumulativeDelayMs);
+          revealTimersRef.current.push(doneTimer);
+        }
       } else {
         setModuleRevealMessageId(null);
         setModuleRevealCount(0);
@@ -677,11 +755,11 @@ export function useChatEngine(): ChatEngine {
       addMessage({
         id: aiMessageId,
         sender: "ai",
-        text: data.assistantMessage,
-        modules,
+        text: sanitizeAssistantText(data.assistantMessage),
+        modules: newInlineModules,
       });
     },
-    [addMessage, applyServerState, clearRevealTimers, ensureSession],
+    [addMessage, applyServerState, clearRevealTimers, ensureSession, fastModuleReveal],
   );
 
   const handleSend = useCallback(
@@ -854,9 +932,7 @@ export function useChatEngine(): ChatEngine {
           rows = msgData.messages ?? [];
         }
         const hydrated = mapServerRowsToMessages(rows, data.step, data.ui, data.facts);
-        const inlineMods = nextModules(data.step, data.ui, data.facts).filter(
-          (m) => !RIGHT_PANEL_MODULE_TYPES.has(m),
-        );
+        const inlineMods = nextModules(data.step, data.ui, data.facts);
         let lastAiId: string | null = null;
         for (let i = hydrated.length - 1; i >= 0; i -= 1) {
           if (hydrated[i].sender === "ai") {
@@ -942,6 +1018,7 @@ export function useChatEngine(): ChatEngine {
     setLoadingStepNumber(null);
     clearRevealTimers();
     manuallyExpandedModulesRef.current = new Set();
+    surfacedInlineModulesRef.current = new Set();
 
     const run = async () => {
       try {
@@ -963,7 +1040,7 @@ export function useChatEngine(): ChatEngine {
     (text: string) => {
       if (isTyping || isUploading || loadingStepNumber !== null) return;
       setInputValue(text);
-      setTimeout(() => handleSend(text), 200);
+      handleSend(text);
     },
     [handleSend, isTyping, isUploading, loadingStepNumber],
   );

@@ -11,8 +11,10 @@ import {
   Hash,
   Trash2,
 } from "lucide-react";
-import type { SessionFacts } from "@/app/_types/dashboard";
+import type { SessionFacts, Stage } from "@/app/_types/dashboard";
 import { formatIncomeBracketLabel } from "@/app/_constants/dashboard";
+
+type SectionFillStatus = "filled" | "partial" | "empty";
 
 /* ─── Modular Fact Card ─── */
 
@@ -28,7 +30,7 @@ function FactCard({
   readonly label: string;
   readonly isOpen: boolean;
   readonly onToggle: () => void;
-  readonly status?: "filled" | "partial" | "empty";
+  readonly status?: SectionFillStatus;
   readonly children: React.ReactNode;
 }) {
   const statusClass = status ? `fact-card--${status}` : "";
@@ -101,23 +103,132 @@ function EmptyVal() {
 
 /* ─── Section fill-status helpers ─── */
 
-function getProviderStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+function getProviderStatus(f: SessionFacts): SectionFillStatus {
   if (f.hospitalName && f.hospitalId) return "filled";
   if (f.hospitalName || f.hospitalId) return "partial";
   return "empty";
 }
-function getBillStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+function getBillStatus(f: SessionFacts): SectionFillStatus {
   if (f.estimatedBillTotal && f.parsedBillId && f.analysisId) return "filled";
   if (f.estimatedBillTotal || f.uploadedBillId) return "partial";
   return "empty";
 }
-function getEligibilityStatus(f: SessionFacts): "filled" | "partial" | "empty" {
+function getEligibilityStatus(f: SessionFacts): SectionFillStatus {
   if (f.assistanceEligible === "likely" || f.assistanceEligible === "unlikely") return "filled";
   if (f.incomeBracket || f.assistanceEligible === "checking") return "partial";
   return "empty";
 }
 function getResolutionStatus(f: SessionFacts): "filled" | "empty" {
-  return f.negotiationOutcome ? "filled" : "empty";
+  const eligibilityDone =
+    f.assistanceEligible === "likely" || f.assistanceEligible === "unlikely";
+  return f.negotiationOutcome || eligibilityDone ? "filled" : "empty";
+}
+
+type ChecklistStatus = "completed" | "active" | "pending";
+
+function ChecklistSection({
+  facts,
+  stage,
+  isLoading,
+  incomeConfirmed,
+  hasStrategyPlan,
+  hasPhoneScript,
+}: {
+  readonly facts: SessionFacts;
+  readonly stage: Stage;
+  readonly isLoading: boolean;
+  readonly incomeConfirmed: boolean;
+  readonly hasStrategyPlan: boolean;
+  readonly hasPhoneScript: boolean;
+}) {
+  const rawItems: Array<{ id: string; label: string; completed: boolean }> = [
+    { id: "bill", label: "Bill uploaded", completed: Boolean(facts.uploadedBillId) },
+    { id: "analysis", label: "Analysis completed", completed: Boolean(facts.analysisId) },
+    { id: "income", label: "Income confirmed", completed: incomeConfirmed },
+    {
+      id: "eligibility",
+      label: "Eligibility reviewed",
+      completed: facts.assistanceEligible === "likely" || facts.assistanceEligible === "unlikely",
+    },
+    { id: "plan", label: "Strategy drafted", completed: hasStrategyPlan },
+    { id: "script", label: "Call script prepared", completed: hasPhoneScript },
+    {
+      id: "resolution",
+      label: "Resolution recorded",
+      completed:
+        stage === "RESOLVED" ||
+        facts.assistanceEligible === "likely" ||
+        facts.assistanceEligible === "unlikely",
+    },
+  ];
+
+  // Enforce strict step-by-step completion: a step cannot complete before all prior steps are complete.
+  const items = rawItems.map((item, idx) => {
+    const previousDone = rawItems.slice(0, idx).every((prev) => prev.completed);
+    return {
+      ...item,
+      completed: item.completed && previousDone,
+    };
+  });
+
+  const firstIncompleteIdx = items.findIndex((item) => !item.completed);
+  const activeIdx = firstIncompleteIdx;
+
+  const statusFor = (idx: number, completed: boolean): ChecklistStatus => {
+    if (completed) return "completed";
+    if (idx === activeIdx) return "active";
+    return "pending";
+  };
+
+  return (
+    <section className="facts-checklist" aria-label="Checklist">
+      <div className="facts-checklist__title">Checklist</div>
+      <ul className="facts-checklist__list">
+        {items.map((item, idx) => {
+          const status = statusFor(idx, item.completed);
+          let connectorFill = "0%";
+          let dotProgress = "0%";
+          if (status === "completed") {
+            connectorFill = "100%";
+            dotProgress = "100%";
+          } else if (status === "active") {
+            connectorFill = "50%";
+            dotProgress = "50%";
+          }
+
+          let statusLabel = "Not started";
+          if (status === "completed") {
+            statusLabel = "Done";
+          } else if (status === "active") {
+            statusLabel = "Pending";
+          }
+
+          return (
+            <li key={item.id} className={`facts-checklist__item facts-checklist__item--${status}`}>
+              <div
+                className="facts-checklist__rail"
+                style={{ "--dot-progress": dotProgress } as React.CSSProperties}
+              >
+                <span className="facts-checklist__dot" />
+                {idx < items.length - 1 && (
+                  <span
+                    className="facts-checklist__connector"
+                    style={{ "--connector-fill": connectorFill } as React.CSSProperties}
+                  />
+                )}
+              </div>
+              <div className="facts-checklist__body">
+                <span className="facts-checklist__label">{item.label}</span>
+                <span className={`facts-checklist__pill facts-checklist__pill--${status}`}>
+                  {statusLabel}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 /* ─── Main component ─── */
@@ -125,24 +236,30 @@ function getResolutionStatus(f: SessionFacts): "filled" | "empty" {
 interface SessionFactsProps {
   readonly facts: SessionFacts;
   readonly flashFields: Set<string>;
-  readonly summaryExpanded: boolean;
+  readonly stage: Stage;
+  readonly isLoading: boolean;
+  readonly incomeConfirmed: boolean;
+  readonly hasStrategyPlan: boolean;
+  readonly hasPhoneScript: boolean;
   readonly openSections: Record<string, boolean>;
   readonly techIdsOpen: boolean;
   readonly onToggleSection: (key: string) => void;
   readonly onToggleTechIds: () => void;
-  readonly onToggleSummary: () => void;
   readonly onClearSession: () => void;
 }
 
 export function SessionFactsPanel({
   facts,
   flashFields,
-  summaryExpanded,
+  stage,
+  isLoading,
+  incomeConfirmed,
+  hasStrategyPlan,
+  hasPhoneScript,
   openSections,
   techIdsOpen,
   onToggleSection,
   onToggleTechIds,
-  onToggleSummary,
   onClearSession,
 }: SessionFactsProps) {
   return (
@@ -289,6 +406,15 @@ export function SessionFactsPanel({
           )}
         </FactCard>
       </div>
+
+      <ChecklistSection
+        facts={facts}
+        stage={stage}
+        isLoading={isLoading}
+        incomeConfirmed={incomeConfirmed}
+        hasStrategyPlan={hasStrategyPlan}
+        hasPhoneScript={hasPhoneScript}
+      />
 
       {/* Footer actions */}
       <div className="facts-panel__footer">

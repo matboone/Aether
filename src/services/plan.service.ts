@@ -89,7 +89,7 @@ export const planService = {
     ];
 
     const callInstructions = [
-      "Stay on the line until a billing review case number is provided.",
+      "Ask for a billing review case number before ending the call.",
       "Write down any revised balance or promised follow-up timeline.",
       "If the first representative cannot help, ask for a supervisor review.",
     ];

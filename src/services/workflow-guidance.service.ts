@@ -135,7 +135,11 @@ export function buildGuidedAssistantMessage(input: {
   if (input.step === "STRATEGY_READY") {
     const likelyWaiver =
       input.ui.negotiationPlan?.assistanceAssessment?.likelyOutcome === "full_waiver";
-    const firstInstruction = input.ui.negotiationPlan?.callInstructions?.[0];
+    const firstInstructionRaw = input.ui.negotiationPlan?.callInstructions?.[0];
+    const firstInstruction = firstInstructionRaw?.replace(
+      /stay on the line until a billing review case number is provided\.?/i,
+      "Ask for a billing review case number before ending the call.",
+    );
     const assessment = input.ui.negotiationPlan?.assistanceAssessment;
     const likelyEligible = assessment?.likelyEligible;
     const outcome = assessment?.likelyOutcome?.replaceAll("_", " ") ?? null;

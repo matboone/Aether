@@ -9,13 +9,35 @@ export const MODULE_ORDER: ModuleType[] = [
   "eligibility",
   "action-plan",
   "phone-script",
+  "doc-chips",
   "resolution",
 ];
 
 export const RIGHT_PANEL_MODULE_TYPES: Set<ModuleType> = new Set([
+  "eligibility",
   "action-plan",
   "phone-script",
+  "doc-chips",
 ]);
+
+function isStrategyStillActive(step: SessionStep): boolean {
+  return step !== "RESOLUTION_RECORDED" && step !== "COMPLETE";
+}
+
+function isStrategyPhase(step: SessionStep): boolean {
+  return step === "STRATEGY_READY" || step === "NEGOTIATION_IN_PROGRESS";
+}
+
+function isAwaitingIncomeChoice(step: SessionStep, facts: DomainSessionFacts): boolean {
+  return !facts.incomeBracket && (step === "AWAITING_INCOME" || step === "BILL_ANALYZED");
+}
+
+function hasEligibilityOutcome(facts: DomainSessionFacts, ui: RenderableSessionUi): boolean {
+  return (
+    facts.assistanceEligible !== null &&
+    facts.assistanceEligible !== undefined
+  ) || Boolean(ui.negotiationPlan?.assistanceAssessment);
+}
 
 export function nextModules(
   step: SessionStep,
@@ -23,31 +45,44 @@ export function nextModules(
   facts: DomainSessionFacts,
 ): ModuleType[] {
   const set = new Set<ModuleType>();
-  const strategyStillActive = step !== "RESOLUTION_RECORDED" && step !== "COMPLETE";
+  const strategyStillActive = isStrategyStillActive(step);
+  const awaitingIncomeChoice = isAwaitingIncomeChoice(step, facts);
+  const hasPlan = Boolean(ui.negotiationPlan);
+  const hasPlanActions = (ui.negotiationPlan?.nextActions?.length ?? 0) > 0;
+  const hasPhoneScript = (ui.negotiationPlan?.phoneScript?.length ?? 0) > 0;
+  const hasResolution = !strategyStillActive;
+  const strategyPhase = isStrategyPhase(step);
 
-  if (ui.canUploadBill) set.add("upload");
+  if (ui.canUploadBill) {
+    set.add("upload");
+  }
+
   if (ui.analysisSummary) {
     set.add("bill-summary");
     if ((ui.flaggedItems?.length ?? 0) > 0) {
       set.add("line-items");
     }
   }
-  const awaitingIncomeChoice =
-    !facts.incomeBracket && (step === "AWAITING_INCOME" || step === "BILL_ANALYZED");
+
   if (awaitingIncomeChoice) {
     set.add("income-selector");
   }
-  if (facts.assistanceEligible !== null && facts.assistanceEligible !== undefined) {
+
+  if (hasEligibilityOutcome(facts, ui)) {
     set.add("eligibility");
   }
-  if (ui.negotiationPlan && strategyStillActive) {
+
+  if ((hasPlan || strategyPhase) && strategyStillActive) {
     set.add("action-plan");
-    set.add("phone-script");
-    if (ui.negotiationPlan.assistanceAssessment) {
-      set.add("eligibility");
+    if (hasPlanActions || step === "NEGOTIATION_IN_PROGRESS") {
+      set.add("phone-script");
+    }
+    if (hasPhoneScript) {
+      set.add("doc-chips");
     }
   }
-  if (ui.resolutionSummary && (step === "RESOLUTION_RECORDED" || step === "COMPLETE")) {
+
+  if (ui.resolutionSummary && hasResolution) {
     set.add("resolution");
   }
 
