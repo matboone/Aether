@@ -82,6 +82,12 @@ const MODULE_ORDER: ModuleType[] = [
   "resolution",
 ];
 
+const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
+  "bill-summary",
+  "line-items",
+  "eligibility",
+]);
+
 function formatCurrency(value: number | null | undefined): string | null {
   if (value === null || value === undefined || Number.isNaN(value)) return null;
   return new Intl.NumberFormat("en-US", {
@@ -466,6 +472,7 @@ export function useChatEngine(): ChatEngine {
       setMinimizedModules(() => {
         const next = new Set<ModuleType>();
         for (const moduleType of visibleModules) {
+          if (NON_MINIMIZABLE_MODULES.has(moduleType)) continue;
           if (moduleType === latestModule) continue;
           if (manuallyExpandedModulesRef.current.has(moduleType)) continue;
           next.add(moduleType);
@@ -812,6 +819,9 @@ export function useChatEngine(): ChatEngine {
   );
 
   const toggleMinimize = useCallback((m: ModuleType) => {
+    if (NON_MINIMIZABLE_MODULES.has(m)) {
+      return;
+    }
     setMinimizedModules((prev) => {
       const next = new Set(prev);
       if (next.has(m)) {

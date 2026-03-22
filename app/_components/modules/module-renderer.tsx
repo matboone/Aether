@@ -222,6 +222,12 @@ const MODULE_LABELS: Record<ModuleType, string> = {
   "resolution": "Resolution Summary",
 };
 
+const NON_MINIMIZABLE_MODULES: Set<ModuleType> = new Set([
+  "bill-summary",
+  "line-items",
+  "eligibility",
+]);
+
 interface ModuleRendererProps {
   readonly moduleType: ModuleType;
   readonly idx: number;
@@ -299,7 +305,8 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
   const delay = idx * 80;
   const loadDelay = LOAD_DELAYS[moduleType] ?? 0;
   const [loading, setLoading] = useState(loadDelay > 0);
-  const isMinimized = engine.minimizedModules.has(moduleType);
+  const forceExpanded = NON_MINIMIZABLE_MODULES.has(moduleType);
+  const isMinimized = !forceExpanded && engine.minimizedModules.has(moduleType);
   const moduleStatus = getModuleStatus(moduleType, engine);
 
   let inferredEligible: boolean | null = null;
@@ -336,12 +343,12 @@ export function ModuleRenderer({ moduleType, idx, engine, bare }: ModuleRenderer
       <span className="module-card__min-label">{MODULE_LABELS[moduleType]}</span>
       <span className="module-card__min-right">
         <ModuleStatusBadge status={moduleStatus} />
-        {!bare && (isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
+        {!bare && !forceExpanded && (isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
       </span>
     </>
   );
 
-  const MinHeader = bare ? (
+  const MinHeader = bare || forceExpanded ? (
     <div className="module-card__min-header module-card__min-header--static">
       {HeaderContent}
     </div>
