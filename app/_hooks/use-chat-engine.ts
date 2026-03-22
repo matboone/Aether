@@ -262,48 +262,109 @@ function deriveSuggestionChips(input: {
   const chips: string[] = [];
   const lastAi = [...input.messages].reverse().find((message) => message.sender === "ai")?.text.toLowerCase() ?? "";
 
-  if (!input.facts.hospitalName) {
-    chips.push(
-      "The bill is from Cigna Healthcare",
-      "I’m not sure which hospital billed me",
-      "Where can I find the provider name on my statement?",
-    );
-  } else if (input.facts.hasInsurance === null) {
-    chips.push(
-      "I have insurance",
-      "I’m uninsured",
-      "I’m underinsured",
-    );
-  } else if (!input.uploaded && !input.facts.uploadedBillId) {
-    chips.push(
-      "I can upload the PDF now",
-      "What counts as an itemized bill PDF?",
-      "I don’t have the PDF yet",
-    );
-  } else if (!input.analysisReady || input.stage === "BILL_PROCESSING") {
-    chips.push(
-      "What happens while this is processing?",
-      "How long does bill analysis usually take?",
-      "What will you look for in the bill?",
-    );
-  } else if (input.stage === "INCOME_CHECK" || input.stage === "ANALYSIS_COMPLETE") {
-    chips.push(
-      "Explain the biggest flagged charge",
-      "Show estimated savings",
-      "Let’s continue to income check",
-    );
-  } else if (input.stage === "ACTION_PLAN" || input.stage === "SCRIPT_GENERATED") {
-    chips.push(
-      "Give me the exact call script",
-      "What should I ask for first?",
-      "Can you draft the dispute summary?",
-    );
-  } else if (input.stage === "RESOLVED") {
-    chips.push(
-      "Summarize total savings",
-      "Help me ask for a payment plan",
-      "Start a new case",
-    );
+  switch (input.stage) {
+    case "INTRO":
+      chips.push(
+        "I have an unpaid hospital bill",
+        "I need help managing a medical bill",
+        "Can you walk me through this step by step?",
+      );
+      break;
+    case "HOSPITAL_ID":
+      chips.push(
+        "The bill is from Cigna Healthcare",
+        "I’m not sure which hospital billed me",
+        "Where can I find the provider name on my statement?",
+      );
+      break;
+    case "INSURANCE_CHECK":
+      chips.push(
+        "I have insurance",
+        "I’m uninsured",
+        "I’m underinsured",
+      );
+      break;
+    case "ITEMIZED_EXPLAIN":
+      chips.push(
+        "What is an itemized bill?",
+        "How do I request it from billing?",
+        "I don’t have one yet",
+      );
+      break;
+    case "BILL_UPLOAD":
+      chips.push(
+        "I can upload the PDF now",
+        "What counts as an itemized bill PDF?",
+        "I don’t have the PDF yet",
+      );
+      break;
+    case "BILL_PROCESSING":
+      chips.push(
+        "What happens while this is processing?",
+        "How long does analysis usually take?",
+        "What will you check first?",
+      );
+      break;
+    case "ANALYSIS_COMPLETE":
+      chips.push(
+        "Tell me about the flagged charges",
+        "Show estimated savings",
+        "What should I do first?",
+      );
+      break;
+    case "INCOME_CHECK":
+      chips.push(
+        "Under $25k",
+        "$25k–$40k",
+        "$40k–$60k",
+      );
+      break;
+    case "ELIGIBILITY_RESULT":
+      chips.push(
+        "Am I likely eligible?",
+        "What documents do I need?",
+        "What should I ask billing next?",
+      );
+      break;
+    case "ACTION_PLAN":
+      chips.push(
+        "Give me the exact first ask",
+        "Show my strategy checklist",
+        "Draft my dispute summary",
+      );
+      break;
+    case "SCRIPT_GENERATED":
+      chips.push(
+        "Give me the exact call script",
+        "How should I respond if they push back?",
+        "What phone number should I call?",
+      );
+      break;
+    case "RESOLVED":
+      chips.push(
+        "Summarize total savings",
+        "Help me ask for a payment plan",
+        "Start a new case",
+      );
+      break;
+    default:
+      break;
+  }
+
+  if (input.stage === "INTRO" && !input.facts.hospitalName) {
+    chips.push("The bill is from Cigna Healthcare");
+  }
+
+  if (
+    (input.stage === "INTRO" || input.stage === "BILL_UPLOAD") &&
+    !input.uploaded &&
+    !input.facts.uploadedBillId
+  ) {
+    chips.push("I’m ready to upload my PDF");
+  }
+
+  if ((input.stage === "BILL_PROCESSING" || input.stage === "ANALYSIS_COMPLETE") && !input.analysisReady) {
+    chips.push("Is analysis still running?");
   }
 
   if (lastAi.includes("itemized") || lastAi.includes("upload")) {
