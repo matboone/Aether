@@ -223,11 +223,14 @@
 }
 
 .aether-chat__topbar {
-  padding: 1.25rem clamp(2rem, 10%, 8rem) 0.75rem clamp(2.5rem, 12%, 10rem);
+  padding: 1.25rem 1.5rem 0.75rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .aether-chat__back-btn {
@@ -291,10 +294,14 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 clamp(3rem, 15%, 12rem) 140px clamp(3rem, 15%, 12rem);
+  padding: 1.5rem 1.5rem 180px;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  align-self: center;
 }
 
 .aether-chat__thread::-webkit-scrollbar {
@@ -1307,9 +1314,10 @@
 .aether-input-bar {
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.75rem clamp(3rem, 15%, 12rem) 1.5rem clamp(3rem, 15%, 12rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, 100% - 3rem);
+  padding: 0.75rem 0 1.5rem;
   background: rgba(250, 248, 246, 0.88);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -1429,28 +1437,28 @@
 /* ─── Unified Right Panel (tabbed, draggable) ─── */
 
 .right-panel {
-  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  right: 0;
   height: 100vh;
+  width: 300px;
   display: flex;
   flex-direction: column;
   background: var(--clr-surface-container);
   overflow: hidden;
-  animation: fadeSlideIn 350ms ease-out both;
+  border-left: 1px solid var(--clr-outline);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.06);
+  transform: translateX(0);
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+}
+
+.right-panel--hidden {
+  transform: translateX(105%);
 }
 
 .right-panel__drag-handle {
-  width: 5px;
-  flex-shrink: 0;
-  cursor: col-resize;
-  background: transparent;
-  transition: background 150ms ease;
-  align-self: stretch;
-  touch-action: none;
-}
-
-.right-panel__drag-handle:hover,
-.right-panel__drag-handle:active {
-  background: var(--clr-primary-fixed);
+  display: none;
 }
 
 .right-panel__tabs {

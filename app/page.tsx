@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import "./dashboard.css";
 import { useChatEngine } from "./_hooks/use-chat-engine";
 import { STAGE_LABELS } from "./_constants/dashboard";
@@ -15,40 +15,12 @@ import { CaduceusIcon } from "./_components/caduceus-icon";
 
 type RightTab = "info" | "strategy";
 
-const MIN_PANEL_W = 240;
-const MAX_PANEL_W = 520;
-const DEFAULT_PANEL_W = 290;
-
 export default function AetherDashboard() {
   const engine = useChatEngine();
   const showWelcome = !engine.hasStarted;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rightTab, setRightTab] = useState<RightTab>("info");
-  const [panelOpen, setPanelOpen] = useState(true);
-
-  /* ─── Draggable panel width ─── */
-  const [panelW, setPanelW] = useState(DEFAULT_PANEL_W);
-  const dragging = useRef(false);
-  const startX = useRef(0);
-  const startW = useRef(DEFAULT_PANEL_W);
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    dragging.current = true;
-    startX.current = e.clientX;
-    startW.current = panelW;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [panelW]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const delta = startX.current - e.clientX; // leftward = wider
-    const next = Math.min(MAX_PANEL_W, Math.max(MIN_PANEL_W, startW.current + delta));
-    setPanelW(next);
-  }, []);
-
-  const onPointerUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   /* Show the right panel once we have any data */
   const hasFacts =
@@ -174,21 +146,11 @@ export default function AetherDashboard() {
         )}
       </main>
 
-      {/* ─── Unified Right Panel (draggable, tabbed) ─── */}
-      {showRightPanel && panelOpen && (
-        <>
-          {/* Drag handle */}
-          <div
-            className="right-panel__drag-handle"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
-
-          <aside
-            className="right-panel"
-            style={{ width: panelW }}
-          >
+      {/* ─── Right Panel (fixed overlay, slide in/out) ─── */}
+      {showRightPanel && (
+        <aside
+          className={`right-panel${panelOpen ? "" : " right-panel--hidden"}`}
+        >
             {/* Tab bar */}
             <div className="right-panel__tabs">
               <button
@@ -239,7 +201,6 @@ export default function AetherDashboard() {
               )}
             </div>
           </aside>
-        </>
       )}
 
       {/* ─── Settings Dialog ─── */}
